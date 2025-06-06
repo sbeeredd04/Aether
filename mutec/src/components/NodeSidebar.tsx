@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { FiRefreshCw, FiTrash2, FiPlus, FiX } from 'react-icons/fi';
-import { CustomNodeData } from '../store/chatStore';
+import { CustomNodeData, useChatStore, ChatMessage } from '../store/chatStore';
 
 interface NodeSidebarProps {
   isOpen: boolean;
@@ -27,15 +27,60 @@ export default function NodeSidebar({
   onBranch,
   width = 384
 }: NodeSidebarProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { getPathToNode, nodes, edges } = useChatStore();
+  
+  // Get all messages in the conversation thread from root to current node
+  const threadMessages = nodeId ? getFullConversationThread(nodeId) : [];
+  
+  function getFullConversationThread(targetNodeId: string): ChatMessage[] {
+    // First get all nodes in the path from root to target
+    const pathNodeIds = getPathFromRootToNode(targetNodeId);
+    
+    // Then collect all messages from these nodes in order
+    const allMessages: ChatMessage[] = [];
+    pathNodeIds.forEach(id => {
+      const node = nodes.find(n => n.id === id);
+      if (node && node.data.chatHistory) {
+        allMessages.push(...node.data.chatHistory);
+      }
+    });
+    
+    return allMessages;
+  }
+  
+  function getPathFromRootToNode(targetId: string): string[] {
+    const path: string[] = [];
+    let currentId: string | undefined = targetId;
+    const incoming = new Map<string, string>();
+    
+    // Build map of target -> source relationships
+    edges.forEach(e => incoming.set(e.target, e.source));
+    
+    // Traverse up the tree to root
+    while (currentId) {
+      path.unshift(currentId); // Add to beginning of array
+      currentId = incoming.get(currentId);
+      if (!currentId) break;
+    }
+    
+    return path;
+  }
+  
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [threadMessages.length]);
+
   if (!isOpen || !data) return null;
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
 
   return (
-    <div 
-      className="h-full overflow-y-auto"
-    >
-      <div className="p-6">
+    <div className="h-full flex flex-col">
+      <div className="p-6 border-b border-white/10 flex-shrink-0">
         <div className="flex justify-between items-center mb-6">
           <h2 className="font-medium text-xl text-white">{data.label || 'New Chat'}</h2>
           <button 
@@ -47,7 +92,7 @@ export default function NodeSidebar({
           </button>
         </div>
         
-        <div className="flex gap-4 mb-6">
+        <div className="flex gap-4">
           {hasResponse && (
             <button 
               onClick={onBranch} 
@@ -74,9 +119,14 @@ export default function NodeSidebar({
             </button>
           )}
         </div>
-        
-        <div className="space-y-4">
-          {data.chatHistory.map((msg, idx) => (
+      </div>
+      
+      <div 
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent"
+      >
+        {threadMessages.length > 0 ? (
+          threadMessages.map((msg, idx) => (
             <div 
               key={idx} 
               className={`p-4 rounded-xl ${
@@ -90,8 +140,12 @@ export default function NodeSidebar({
               </div>
               <div className="whitespace-pre-wrap text-white">{msg.content}</div>
             </div>
-          ))}
-        </div>
+          ))
+        ) : (
+          <div className="text-center text-gray-400 py-8">
+            No messages in this conversation yet
+          </div>
+        )}
       </div>
     </div>
   );

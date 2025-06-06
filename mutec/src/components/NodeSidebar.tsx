@@ -96,11 +96,26 @@ export default function NodeSidebar({
 
   return (
     <div className="h-full flex flex-col bg-black/40 rounded-xl border border-white/10 shadow-xl" style={{ width }}>
-      <div className="p-4 border-b border-white/10 flex-shrink-0 flex items-center justify-between">
-        <h2 className="font-semibold text-lg text-white truncate">{data?.label || 'New Chat'}</h2>
-        <button onClick={onClose} className="hover:text-white text-gray-300 transition-colors" title="Close">
-          <FiX size={20} />
-        </button>
+      <div className="p-4 border-b border-white/10 flex-shrink-0">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-semibold text-lg text-white truncate group relative">
+            {data?.label || 'New Chat'}
+            {/* Tooltip for long titles */}
+            {data?.label && data.label.length > 30 && (
+              <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50">
+                {data.label}
+              </div>
+            )}
+          </h2>
+          <button onClick={onClose} className="hover:text-white text-gray-300 transition-colors" title="Close">
+            <FiX size={20} />
+          </button>
+        </div>
+        {data?.chatHistory.length > 0 && (
+          <div className="text-sm text-white/50">
+            {data.chatHistory.length} messages in this conversation
+          </div>
+        )}
       </div>
       <div className="flex gap-3 px-4 py-2 border-b border-white/10 bg-black/20">
         {hasResponse && (

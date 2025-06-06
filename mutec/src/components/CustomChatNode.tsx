@@ -162,8 +162,27 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
         className={`w-2 h-2 ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
       />
       <div className="flex justify-between items-center mb-3">
-        <div className="font-medium text-base truncate flex-1 text-white">
-          {isRootNode ? 'Root Node' : (data.label || 'New Chat')}
+        <div className="font-medium text-base truncate flex-1 text-white group relative">
+          <div className="flex items-center gap-2">
+            {isRootNode ? (
+              <span className="text-purple-400">Root Node</span>
+            ) : (
+              <>
+                <span className="text-white/90">{data.label || 'New Chat'}</span>
+                {data.chatHistory.length > 0 && (
+                  <span className="text-xs text-white/50">
+                    ({data.chatHistory.length} messages)
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          {/* Tooltip for long titles */}
+          {data.label && data.label.length > 30 && (
+            <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50">
+              {data.label}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           {hasResponse && (

@@ -11,6 +11,7 @@ import {
 } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 import { ChatManager } from '../utils/chatManager';
+import logger from '../utils/logger';
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -186,18 +187,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 )
               : [...node.data.chatHistory, message];
 
-          let newLabel = node.data.label;
-          if (message.role === 'model' && !isPartial && message.content) {
-            newLabel = message.content.substring(0, 30) + (message.content.length > 30 ? '...' : '');
-          } else if (message.role === 'user' && !isPartial && message.content) {
-            newLabel = `User: ${message.content.substring(0, 20)}...`;
+          // Generate a new title when we get a model response
+          if (message.role === 'model' && !isPartial && state.chatManager) {
+            // Use the last few messages for context
+            const recentMessages = updatedChatHistory.slice(-4);
+            state.chatManager.generateTitle(recentMessages).then(newTitle => {
+              set(state => ({
+                nodes: state.nodes.map(n => 
+                  n.id === nodeId 
+                    ? { ...n, data: { ...n.data, label: newTitle } }
+                    : n
+                )
+              }));
+            }).catch(error => {
+              logger.error('Error generating title', { error });
+              // Fallback to simple title
+              const fallbackTitle = message.content.substring(0, 30) + (message.content.length > 30 ? '...' : '');
+              set(state => ({
+                nodes: state.nodes.map(n => 
+                  n.id === nodeId 
+                    ? { ...n, data: { ...n.data, label: fallbackTitle } }
+                    : n
+                )
+              }));
+            });
           }
 
           return {
             ...node,
             data: {
               ...node.data,
-              label: newLabel,
               chatHistory: updatedChatHistory,
             },
           };

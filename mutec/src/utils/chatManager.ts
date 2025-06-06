@@ -96,4 +96,31 @@ export class ChatManager {
   clearThreads() {
     this.threads.clear();
   }
+
+  // Generate a title for a conversation node
+  async generateTitle(messages: ChatMessage[]): Promise<string> {
+    try {
+      const model = this.ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      
+      // Create a prompt that asks for a concise title
+      const prompt = `Given this conversation, generate a concise title (max 30 chars) that captures the main topic or question. Only return the title, no explanation:
+
+${messages.map(msg => `${msg.role}: ${msg.content}`).join('\n')}`;
+
+      const result = await model.generateContent(prompt);
+      const response = result?.response?.text() || '';
+      
+      // Clean up the response and ensure it's not too long
+      const title = response.trim().replace(/^["']|["']$/g, '');
+      return title.length > 30 ? title.substring(0, 27) + '...' : title;
+    } catch (error) {
+      logger.error('Error generating title with Gemini API', { error });
+      // Fallback to a simple title if generation fails
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage) {
+        return lastMessage.content.substring(0, 30) + (lastMessage.content.length > 30 ? '...' : '');
+      }
+      return 'New Chat';
+    }
+  }
 } 

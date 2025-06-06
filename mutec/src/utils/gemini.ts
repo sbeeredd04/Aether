@@ -13,7 +13,7 @@ export interface ChatHistory {
   parts: { text: string }[];
 }
 
-export async function generateContentStream(
+export async function generateContent(
   apiKey: string,
   history: ChatHistory[],
   prompt: string,
@@ -26,16 +26,15 @@ export async function generateContentStream(
 
   try {
     const ai = new GoogleGenAI({ apiKey });
+    // Multi-turn chat: send full history with the new prompt
     const chat = ai.chats.create({
       model: modelName,
       history,
     });
-
-    const stream = await chat.sendMessageStream({
-      message: prompt,
-    });
-
-    return stream;
+    const result = await chat.sendMessage({ message: prompt });
+    // result.candidates[0].content.parts[0].text is the model's response
+    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return text;
   } catch (error) {
     serverLogger.error('Error initializing or using Gemini API', { error });
     if (error instanceof Error) {

@@ -19,7 +19,9 @@ import SettingsPanel from './SettingsPanel';
 const nodeTypes = { chatNode: CustomChatNode };
 
 const flowStyle = {
-  backgroundColor: 'var(--background)',
+  background: 'linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(200,200,255,0.4) 100%)',
+  // fallback for dark mode
+  // will be overridden by dark mode class
 };
 
 export default function ChatCanvas() {
@@ -36,7 +38,7 @@ export default function ChatCanvas() {
   );
 
   return (
-    <div className="w-screen h-screen">
+    <div className="w-screen h-screen bg-gradient-to-br from-white/80 via-blue-100/60 to-blue-200/40 dark:from-[#181c24] dark:via-[#23283a] dark:to-[#1a1d2b] transition-colors duration-300">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -52,19 +54,19 @@ export default function ChatCanvas() {
       >
         <Background 
           variant={BackgroundVariant.Dots} 
-          gap={12} 
-          size={1} 
+          gap={16} 
+          size={1.5} 
           color="currentColor"
-          className="opacity-[0.02]"
+          className="opacity-10 dark:opacity-5"
         />
         <Controls className="glass-morphism !bg-transparent controls-custom" />
         <Panel position="top-right" className="m-4">
           <button 
             onClick={() => setSettingsOpen(true)}
-            className="glass-morphism p-2 rounded-lg hover:bg-white hover:bg-opacity-10 transition-colors"
+            className="glass-morphism p-2 rounded-2xl hover:bg-white hover:bg-opacity-20 transition-colors"
             aria-label="Open Settings"
           >
-            <FiSettings size={20} />
+            <FiSettings size={22} />
           </button>
         </Panel>
       </ReactFlow>

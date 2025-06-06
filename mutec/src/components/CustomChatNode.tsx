@@ -33,11 +33,11 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   const { addMessageToNode, createNodeAndEdge, getPathToNode, resetNode, deleteNodeAndDescendants } = useChatStore();
   const setActiveNodeId = useChatStore(s => s.setActiveNodeId);
   const activeNodeId = useChatStore(s => s.activeNodeId);
+  const activePath = useChatStore(s => s.activePath);
   const nodes = useChatStore(s => s.nodes);
   const edges = useChatStore(s => s.edges);
-  const pathNodeIds = activeNodeId ? getPathNodeIds(nodes, edges, activeNodeId) : [];
   const isActive = activeNodeId === id;
-  const isPath = pathNodeIds.includes(id);
+  const isInActivePath = activePath.nodeIds.includes(id);
   const nodeRef = useRef<HTMLDivElement>(null);
   const isRootNode = id === 'root';
 
@@ -112,13 +112,14 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   const nodeClass = `
     backdrop-blur-sm 
     ${isActive ? 'bg-neutral-900/30' : 'bg-black/0'}
-    border border-white/10
+    ${isInActivePath ? 'border-purple-500' : 'border-white/10'}
+    border 
     shadow-lg 
     rounded-xl 
     p-4 
     transition-all 
-    ${isActive ? 'ring-1 ring-neutral-500' : ''} 
-    ${isPath && !isActive ? 'border-neutral-500/30' : ''}
+    ${isActive ? 'ring-2 ring-purple-500' : ''} 
+    ${isInActivePath && !isActive ? 'ring-1 ring-purple-400/50' : ''}
   `;
   
   const iconButtonClass = 'hover:text-white text-gray-300 transition-colors';
@@ -143,7 +144,11 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
         </div>
       )}
       
-      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-neutral-400" />
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        className={`w-2 h-2 ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
+      />
       <div className="flex justify-between items-center mb-3">
         <div className="font-medium text-base truncate flex-1 text-white">
           {isRootNode ? 'Root Node' : (data.label || 'New Chat')}
@@ -175,7 +180,11 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
           </div>
         </div>
       ) : null}
-      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-neutral-400" />
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        className={`w-2 h-2 ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
+      />
     </div>
   );
 }

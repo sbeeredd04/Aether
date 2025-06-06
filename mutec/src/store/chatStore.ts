@@ -29,9 +29,15 @@ interface ChatState {
   addMessageToNode: (nodeId: string, message: ChatMessage, isPartial?: boolean) => void;
   createNodeAndEdge: (sourceNodeId: string, label: string, type: 'response' | 'branch') => void;
   getPathToNode: (targetNodeId: string) => ChatMessage[];
+  getPathNodeIds: (targetNodeId: string) => string[];
+  getPathEdgeIds: (targetNodeId: string) => string[];
   resetNode: (nodeId: string) => void;
   deleteNodeAndDescendants: (nodeId: string) => void;
   activeNodeId: string | null;
+  activePath: {
+    nodeIds: string[];
+    edgeIds: string[];
+  };
   setActiveNodeId: (nodeId: string | null) => void;
 }
 
@@ -45,6 +51,10 @@ const ROOT_NODE: Node<CustomNodeData> = {
 export const useChatStore = create<ChatState>((set, get) => ({
   nodes: [ROOT_NODE],
   edges: [],
+  activePath: {
+    nodeIds: [],
+    edgeIds: []
+  },
 
   onNodesChange: (changes) => {
     set((state) => {
@@ -193,23 +203,58 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
-  getPathToNode: (targetNodeId) => {
-    const { nodes, edges } = get();
-    const pathMessages: ChatMessage[] = [];
-    let currentNodeId: string | undefined = targetNodeId;
-
-    const incomingEdgesMap = new Map<string, string>();
+  getPathNodeIds: (targetNodeId) => {
+    const { edges } = get();
+    const path: string[] = [];
+    let currentId: string | undefined = targetNodeId;
+    
+    // Build map of target -> source relationships
+    const incoming = new Map<string, string>();
     edges.forEach((edge) => {
-      incomingEdgesMap.set(edge.target, edge.source);
+      incoming.set(edge.target, edge.source);
     });
-
-    while (currentNodeId) {
-      const currentNode = nodes.find((n) => n.id === currentNodeId);
-      if (currentNode?.data.chatHistory) {
-        pathMessages.push(...currentNode.data.chatHistory);
-      }
-      currentNodeId = incomingEdgesMap.get(currentNodeId);
+    
+    // Traverse up the tree to root
+    while (currentId) {
+      path.unshift(currentId);
+      currentId = incoming.get(currentId);
+      if (!currentId) break;
     }
+    
+    return path;
+  },
+
+  getPathEdgeIds: (targetNodeId) => {
+    const { edges } = get();
+    const nodeIds = get().getPathNodeIds(targetNodeId);
+    const edgeIds: string[] = [];
+    
+    // Find all edges connecting nodes in the path
+    for (let i = 0; i < nodeIds.length - 1; i++) {
+      const sourceId = nodeIds[i];
+      const targetId = nodeIds[i + 1];
+      
+      const edge = edges.find(e => e.source === sourceId && e.target === targetId);
+      if (edge) {
+        edgeIds.push(edge.id);
+      }
+    }
+    
+    return edgeIds;
+  },
+
+  getPathToNode: (targetNodeId) => {
+    const { nodes } = get();
+    const pathNodeIds = get().getPathNodeIds(targetNodeId);
+    const pathMessages: ChatMessage[] = [];
+    
+    // Collect messages from all nodes in the path
+    pathNodeIds.forEach(id => {
+      const node = nodes.find(n => n.id === id);
+      if (node?.data.chatHistory) {
+        pathMessages.push(...node.data.chatHistory);
+      }
+    });
     
     return pathMessages;
   },
@@ -239,5 +284,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   activeNodeId: null,
-  setActiveNodeId: (nodeId) => set({ activeNodeId: nodeId }),
+  setActiveNodeId: (nodeId) => {
+    if (!nodeId) {
+      set({ 
+        activeNodeId: null,
+        activePath: { nodeIds: [], edgeIds: [] }
+      });
+      return;
+    }
+    
+    const nodeIds = get().getPathNodeIds(nodeId);
+    const edgeIds = get().getPathEdgeIds(nodeId);
+    
+    set({ 
+      activeNodeId: nodeId,
+      activePath: { nodeIds, edgeIds }
+    });
+  },
 })); 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { 
   ReactFlow,
   Controls,
@@ -8,6 +8,7 @@ import {
   MarkerType,
   BackgroundVariant,
   Panel,
+  Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -40,8 +41,29 @@ const controlsStyle = {
 };
 
 export default function ChatCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, activeNodeId } = useChatStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, activeNodeId, activePath } = useChatStore();
   const activeNode = nodes.find(n => n.id === activeNodeId);
+
+  // Style edges based on whether they are part of the active path
+  const styledEdges = useMemo(() => {
+    return edges.map(edge => {
+      const isInActivePath = activePath.edgeIds.includes(edge.id);
+      return {
+        ...edge,
+        style: {
+          stroke: isInActivePath ? '#a855f7' : '#555',
+          strokeWidth: isInActivePath ? 2 : 1,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: isInActivePath ? '#a855f7' : '#555',
+          width: isInActivePath ? 12 : 10,
+          height: isInActivePath ? 12 : 10,
+        },
+        animated: isInActivePath,
+      };
+    });
+  }, [edges, activePath.edgeIds]);
 
   const handleConnect = useCallback(
     (params: any) => {
@@ -57,7 +79,7 @@ export default function ChatCanvas() {
       <div className="h-full">
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={styledEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}

@@ -51,15 +51,18 @@ export default function ChatCanvas() {
       return {
         ...edge,
         style: {
-          stroke: isInActivePath ? '#a855f7' : '#555',
-          strokeWidth: isInActivePath ? 2 : 1,
+          stroke: isInActivePath ? '#a855f7' : '#555555',
+          strokeWidth: isInActivePath ? 4 : 2,
+          strokeOpacity: isInActivePath ? 0.9 : 0.5,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: isInActivePath ? '#a855f7' : '#555',
-          width: isInActivePath ? 12 : 10,
-          height: isInActivePath ? 12 : 10,
+          color: isInActivePath ? '#a855f7' : '#555555',
+          width: isInActivePath ? 12 : 8,
+          height: isInActivePath ? 12 : 8,
+          strokeWidth: 0,
         },
+        className: isInActivePath ? 'animated-edge' : '',
         animated: isInActivePath,
       };
     });
@@ -90,6 +93,7 @@ export default function ChatCanvas() {
           maxZoom={1.5}
           defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
           nodesDraggable
+          edgesFocusable={false}
         >
           <Background 
             variant={BackgroundVariant.Dots} 

@@ -9,6 +9,7 @@
   --node-bg: rgba(0, 0, 0, 0.2);
   --node-border: rgba(255, 255, 255, 0.1);
   --glass-blur: 8px;
+  --purple-primary: #a855f7;
 }
 
 body {
@@ -117,6 +118,26 @@ body::before {
 .react-flow__edge.selected path {
   stroke: var(--accent-1);
   stroke-opacity: 1;
+}
+
+/* Enhanced edge styling */
+.react-flow__edge {
+  pointer-events: none;
+}
+
+.react-flow__edge-interaction {
+  display: none;
+}
+
+.react-flow__edge.animated-edge path {
+  stroke-dasharray: 5 3;
+  animation: flowAnimation 30s linear infinite;
+}
+
+@keyframes flowAnimation {
+  to {
+    stroke-dashoffset: -1000;
+  }
 }
 
 /* Node Selection Styles */

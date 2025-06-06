@@ -4,6 +4,7 @@ import React, { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { Handle, Position, Node, Edge } from '@xyflow/react';
 import { useChatStore, CustomNodeData } from '../store/chatStore';
 import { FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import { SiGooglegemini } from 'react-icons/si';
 import logger from '@/utils/logger';
 
 interface ChatMessage {
@@ -26,9 +27,9 @@ function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[
   return path;
 }
 
-function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
+function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isLoading?: boolean } }) {
+  const isLoading = data.isLoading ?? false;
   const [input, setInput] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
   const { addMessageToNode, createNodeAndEdge, getPathToNode, resetNode, deleteNodeAndDescendants } = useChatStore();
   const setActiveNodeId = useChatStore(s => s.setActiveNodeId);
@@ -58,7 +59,6 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
 
   const handleAskLLM = useCallback(async () => {
     if (!input.trim()) return;
-    setIsLoading(true);
     const userMessage: ChatMessage = { role: 'user', content: input };
     addMessageToNode(id, userMessage);
     setInput('');
@@ -87,8 +87,6 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
       }
     } catch (error: any) {
       addMessageToNode(id, { role: 'model', content: `Error: ${error.message || error}` });
-    } finally {
-      setIsLoading(false);
     }
   }, [id, input, addMessageToNode, getPathToNode]);
 
@@ -108,6 +106,10 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
     setActiveNodeId(id);
   };
 
+  // Helper for model name (default Gemini)
+  const getModelName = () => 'Gemini 2.0 Flash';
+  const isGeminiModel = (model?: string) => (model || 'gemini-2.0-flash').toLowerCase().includes('gemini');
+
   // Responsive node class
   const nodeClass = `
     backdrop-blur-sm 
@@ -123,6 +125,15 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   `;
   
   const iconButtonClass = 'hover:text-white text-gray-300 transition-colors';
+
+  // Loading dots animation
+  const LoadingDots = () => (
+    <span className="flex gap-1 items-center h-6">
+      <span className="bg-white/80 rounded-full w-2 h-2 animate-bounce [animation-delay:0ms]"></span>
+      <span className="bg-white/60 rounded-full w-2 h-2 animate-bounce [animation-delay:150ms]"></span>
+      <span className="bg-white/40 rounded-full w-2 h-2 animate-bounce [animation-delay:300ms]"></span>
+    </span>
+  );
 
   return (
     <div
@@ -175,8 +186,24 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
       </div>
       {hasResponse ? (
         <div className="relative">
-          <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white">
+          <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent"
+            style={{ scrollbarColor: 'rgba(255,255,255,0.7) transparent', scrollbarWidth: 'thin' }}
+          >
             {lastModelResponse}
+            {/* Gemini logo at bottom right if Gemini model */}
+            {isGeminiModel() && (
+              <div className="absolute bottom-2 right-2 group" title={getModelName()}>
+                <span className="group-hover:scale-110 transition-transform cursor-pointer">
+                  <SiGooglegemini size={20} className="text-blue-300 drop-shadow-md" />
+                </span>
+              </div>
+            )}
+            {/* Loading animation if isLoading */}
+            {isLoading && (
+              <div className="absolute bottom-2 left-2">
+                <LoadingDots />
+              </div>
+            )}
           </div>
         </div>
       ) : null}

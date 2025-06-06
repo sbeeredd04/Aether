@@ -40,7 +40,7 @@ const controlsStyle = {
   }
 };
 
-export default function ChatCanvas() {
+export default function ChatCanvas({ isLoading = false }) {
   const { nodes, edges, onNodesChange, onEdgesChange, activeNodeId, activePath } = useChatStore();
   const activeNode = nodes.find(n => n.id === activeNodeId);
 
@@ -81,7 +81,13 @@ export default function ChatCanvas() {
     <div className="w-full h-full" style={{ background: '#000000' }}>
       <div className="h-full">
         <ReactFlow
-          nodes={nodes}
+          nodes={nodes.map(node => ({
+            ...node,
+            data: {
+              ...node.data,
+              isLoading: isLoading && node.id === activeNodeId
+            }
+          }))}
           edges={styledEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}

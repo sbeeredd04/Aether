@@ -2,10 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FiSend } from 'react-icons/fi';
 import { useChatStore } from '../store/chatStore';
 
-export default function PromptBar({ node }: { node: any }) {
+interface PromptBarProps {
+  node: any;
+  isLoading: boolean;
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarProps) {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
-  const [isLoading, setIsLoading] = useState(false);
   const addMessageToNode = useChatStore((s) => s.addMessageToNode);
   const getPathToNode = useChatStore((s) => s.getPathToNode);
 

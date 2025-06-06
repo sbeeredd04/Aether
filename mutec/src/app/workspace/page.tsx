@@ -13,6 +13,7 @@ export default function WorkspacePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(384); // Default width (96 * 4 = 384px)
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const resizingRef = useRef(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
@@ -124,7 +125,7 @@ export default function WorkspacePage() {
       <div className="flex flex-1 h-full">
         {/* Canvas area */}
         <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'pr-[10px]' : ''}`}>
-          <ChatCanvas />
+          <ChatCanvas isLoading={isLoading} />
         </div>
         
         {/* Sidebar area */}
@@ -151,6 +152,7 @@ export default function WorkspacePage() {
                 onDelete={handleDelete}
                 onBranch={handleBranch}
                 width={sidebarWidth}
+                isActiveNodeLoading={isLoading}
               />
             </div>
           </div>
@@ -166,7 +168,7 @@ export default function WorkspacePage() {
           zIndex: 60,
         }}
       >
-        <PromptBar node={activeNode} />
+        <PromptBar node={activeNode} isLoading={isLoading} setIsLoading={setIsLoading} />
       </div>
       
       {/* Settings panel */}

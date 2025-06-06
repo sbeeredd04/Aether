@@ -43,6 +43,7 @@ Mutec allows users to create branching conversations from any point in a chat hi
 - [ ] Add support for multiple AI models
 - [ ] Implement markdown rendering for model outputs
 - [ ] Increase node size for better content display
+- [ ] Multiple models and their support
 
 ### Future Enhancements
 
@@ -52,6 +53,11 @@ Mutec allows users to create branching conversations from any point in a chat hi
 - [ ] Mobile-responsive design
 - [ ] Custom themes and visualization options
 - [ ] Collaborative features for team usage
+- [ ] Add thinking model
+- [ ] add image generation and video generation and speech geneeration as well
+- [ ] video and sccreen sharing understanding and support / Live API
+- [ ] document support / File upload
+- [ ] grounding with google search
 
 ## Project Structure
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ChatCanvas from '@/components/ChatCanvas';
 import NodeSidebar from '@/components/NodeSidebar';
+import PromptBar from '@/components/PromptBar';
 import { useChatStore } from '@/store/chatStore';
 import { FiSettings, FiSidebar } from 'react-icons/fi';
 import SettingsPanel from '@/components/SettingsPanel';
@@ -153,6 +154,18 @@ export default function WorkspacePage() {
             </div>
           </div>
         )}
+      </div>
+      
+      {/* PromptBar centered in visible canvas area, offset for sidebar */}
+      <div
+        className="absolute left-0 bottom-0 w-full flex justify-center items-end pointer-events-none mb-6"
+        style={{
+          paddingRight: isSidebarOpen ? sidebarWidth + 10 : 0,
+          transition: 'padding-right 0.2s',
+          zIndex: 60,
+        }}
+      >
+        <PromptBar node={activeNode} />
       </div>
       
       {/* Settings panel */}

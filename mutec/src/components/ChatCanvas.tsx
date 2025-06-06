@@ -14,7 +14,7 @@ import '@xyflow/react/dist/style.css';
 
 import { useChatStore } from '../store/chatStore';
 import CustomChatNode from './CustomChatNode';
-import PromptBar from './PromptBar';
+// import PromptBar from './PromptBar'; // No longer needed
 
 const nodeTypes = { chatNode: CustomChatNode };
 
@@ -107,7 +107,7 @@ export default function ChatCanvas() {
           />
         </ReactFlow>
       </div>
-      <PromptBar node={activeNode} />
+      {/* PromptBar removed from here */}
     </div>
   );
 } 

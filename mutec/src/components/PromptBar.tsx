@@ -18,18 +18,16 @@ export default function PromptBar({ node }: { node: any }) {
     const ta = textareaRef.current;
     ta.style.height = 'auto';
     const scrollHeight = ta.scrollHeight;
-    // Two predefined heights: minHeight = 1.5rem (~24px), expandedHeight = 2x (48px)
-    const twoLineHeight = 48; // 2rem in pixels (approx)
-    if (scrollHeight <= twoLineHeight) {
-      ta.style.height = `${scrollHeight}px`;
+    const minHeight = 32; // 2rem
+    const maxHeight = 120; // 7.5rem
+    if (scrollHeight <= minHeight) {
+      ta.style.height = `${minHeight}px`;
       ta.style.overflowY = 'hidden';
-    } else if (scrollHeight > twoLineHeight && scrollHeight <= 2 * twoLineHeight) {
-      // Up to 2x: let it expand
+    } else if (scrollHeight > minHeight && scrollHeight <= maxHeight) {
       ta.style.height = `${scrollHeight}px`;
       ta.style.overflowY = 'hidden';
     } else {
-      // Beyond 2x: cap height and allow scroll
-      ta.style.height = `${2 * twoLineHeight}px`;
+      ta.style.height = `${maxHeight}px`;
       ta.style.overflowY = 'auto';
     }
   }, [input]);
@@ -44,7 +42,6 @@ export default function PromptBar({ node }: { node: any }) {
     addMessageToNode(node.id, userMessage);
     setInput('');
     if (textareaRef.current) {
-      // Reset textarea height after sending
       textareaRef.current.style.height = 'auto';
     }
 
@@ -79,23 +76,24 @@ export default function PromptBar({ node }: { node: any }) {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center px-2 py-3 pointer-events-none">
-      {/* Glass‐blur container with subtle border */}
+    <div className="w-full flex justify-center items-end pointer-events-none">
       <div
         className="
           backdrop-blur-sm
-          bg-black/20
+          bg-black/30
           border border-white/10
           rounded-xl
           flex items-center
-          w-full max-w-2xl
-          px-3
-          py-2
+          w-full max-w-3xl
+          px-4
+          py-1.5
           pointer-events-auto
+          shadow-lg
         "
+        style={{ minHeight: 48 }}
       >
         {/* Model dropdown */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 mr-2">
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
@@ -115,7 +113,7 @@ export default function PromptBar({ node }: { node: any }) {
         </div>
 
         {/* Textarea wrapper */}
-        <div className="flex-1 mx-2">
+        <div className="flex-1 mx-2 flex items-center">
           <textarea
             ref={textareaRef}
             value={input}
@@ -129,11 +127,13 @@ export default function PromptBar({ node }: { node: any }) {
               text-white
               placeholder-gray-400
               resize-none
-              min-h-[24px]
-              overflow-y-hidden
-              py-2
+              min-h-[32px]
+              max-h-[120px]
+              overflow-y-auto
+              py-1
               pr-10
               leading-snug
+              transition-all
             "
             placeholder="Type your message..."
             disabled={isLoading}
@@ -143,6 +143,7 @@ export default function PromptBar({ node }: { node: any }) {
                 handleAskLLM();
               }
             }}
+            style={{ lineHeight: 1.4 }}
           />
         </div>
 
@@ -158,8 +159,9 @@ export default function PromptBar({ node }: { node: any }) {
             p-2
             disabled:opacity-50 disabled:cursor-not-allowed
             flex items-center justify-center
+            ml-2
           "
-          style={{ width: '2.5rem', height: '2.5rem' }}
+          style={{ width: '2.2rem', height: '2.2rem' }}
         >
           {isLoading ? (
             <span className="animate-spin h-5 w-5 block border-2 border-t-transparent border-current rounded-full" />

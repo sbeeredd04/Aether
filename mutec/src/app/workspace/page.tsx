@@ -31,7 +31,7 @@ export default function WorkspacePage() {
 
   // Handle resize events
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (!resizingRef.current) return;
       
       const newWidth = startWidthRef.current - (e.clientX - startXRef.current);
@@ -59,7 +59,7 @@ export default function WorkspacePage() {
     };
   }, []);
 
-  const startResize = (e) => {
+  const startResize = (e: React.MouseEvent) => {
     resizingRef.current = true;
     startXRef.current = e.clientX;
     startWidthRef.current = sidebarWidth;

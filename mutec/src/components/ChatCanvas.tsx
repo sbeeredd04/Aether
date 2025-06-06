@@ -10,12 +10,16 @@ import {
   Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { FiSettings } from 'react-icons/fi';
+import { FiSettings, FiSidebar } from 'react-icons/fi';
 
 import { useChatStore } from '../store/chatStore';
 import CustomChatNode from './CustomChatNode';
 import SettingsPanel from './SettingsPanel';
 import PromptBar from './PromptBar';
+
+interface ChatCanvasProps {
+  onOpenSidebar?: () => void;
+}
 
 const nodeTypes = { chatNode: CustomChatNode };
 
@@ -41,7 +45,7 @@ const controlsStyle = {
   }
 };
 
-export default function ChatCanvas() {
+export default function ChatCanvas({ onOpenSidebar }: ChatCanvasProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, activeNodeId, setActiveNodeId } = useChatStore();
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const activeNode = nodes.find(n => n.id === activeNodeId);
@@ -82,7 +86,16 @@ export default function ChatCanvas() {
           <Controls 
             className="backdrop-blur-sm bg-black/30 border border-white/10 rounded-lg p-1"
           />
-          <Panel position="top-right" className="m-4">
+          <Panel position="top-right" className="m-4 flex gap-3">
+            {onOpenSidebar && (
+              <button 
+                onClick={onOpenSidebar}
+                className="text-white/80 hover:text-white transition-colors"
+                aria-label="Open Sidebar"
+              >
+                <FiSidebar size={22} />
+              </button>
+            )}
             <button 
               onClick={() => setSettingsOpen(true)}
               className="text-white/80 hover:text-white transition-colors"

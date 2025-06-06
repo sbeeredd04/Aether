@@ -5,7 +5,8 @@ import ChatCanvas from '@/components/ChatCanvas';
 import NodeSidebar from '@/components/NodeSidebar';
 import PromptBar from '@/components/PromptBar';
 import { useChatStore } from '@/store/chatStore';
-import { FiSettings, FiSidebar } from 'react-icons/fi';
+import { FiSettings } from 'react-icons/fi';
+import { BsLayoutSidebarInsetReverse } from "react-icons/bs";
 import SettingsPanel from '@/components/SettingsPanel';
 
 export default function WorkspacePage() {
@@ -107,7 +108,7 @@ export default function WorkspacePage() {
             className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md"
             aria-label="Open Sidebar"
           >
-            <FiSidebar size={22} />
+            <BsLayoutSidebarInsetReverse size={22} />
           </button>
         )}
         <button 

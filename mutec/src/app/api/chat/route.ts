@@ -6,15 +6,20 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const { history, prompt } = await req.json();
+    const { history, prompt, apiKey } = await req.json();
     serverLogger.info('API call received', { prompt });
 
     if (!prompt || !history) {
       serverLogger.warn('Missing prompt or history in request');
       return NextResponse.json({ error: 'Prompt and history are required' }, { status: 400 });
     }
+    
+    if (!apiKey) {
+      serverLogger.warn('Missing API key in request');
+      return NextResponse.json({ error: 'Gemini API key is required' }, { status: 400 });
+    }
 
-    const stream = await generateContentStream(history, prompt);
+    const stream = await generateContentStream(apiKey, history, prompt);
     serverLogger.debug('Stream generation started');
 
     const encoder = new TextEncoder();

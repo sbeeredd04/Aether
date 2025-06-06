@@ -1,22 +1,26 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { 
   ReactFlow,
   Controls,
   Background,
   MarkerType,
   addEdge,
+  Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { FiSettings } from 'react-icons/fi';
 
 import { useChatStore } from '../store/chatStore';
 import CustomChatNode from './CustomChatNode';
+import SettingsPanel from './SettingsPanel';
 
 const nodeTypes = { chatNode: CustomChatNode };
 
 export default function ChatCanvas() {
   const { nodes, edges, onNodesChange, onEdgesChange } = useChatStore();
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
 
   const handleConnect = useCallback(
     (params: any) => {
@@ -46,7 +50,17 @@ export default function ChatCanvas() {
       >
         <Controls />
         <Background variant="dots" gap={12} size={1} />
+        <Panel position="top-right">
+            <button 
+                onClick={() => setSettingsOpen(true)}
+                className="p-2 bg-white dark:bg-gray-800 rounded-md shadow-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                aria-label="Open Settings"
+            >
+                <FiSettings size={20} />
+            </button>
+        </Panel>
       </ReactFlow>
+      <SettingsPanel isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 } 

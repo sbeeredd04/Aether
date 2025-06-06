@@ -22,10 +22,21 @@ async function fetchStream(
   onError: (error: any) => void
 ) {
   try {
+    const savedSettings = localStorage.getItem('mutec-settings');
+    if (!savedSettings) {
+        throw new Error("API key not found. Please set it in the settings panel.");
+    }
+    const settings = JSON.parse(savedSettings);
+    const apiKey = settings.apiKey;
+
+    if (!apiKey) {
+        throw new Error("API key is empty. Please set it in the settings panel.");
+    }
+
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ history, prompt }),
+      body: JSON.stringify({ history, prompt, apiKey }),
     });
 
     if (!response.body) {
@@ -61,8 +72,13 @@ async function fetchStream(
       }
     }
   } catch (error) {
+    // Modify the error handling to display a more user-friendly message
+    if (error instanceof Error) {
+        onError(error.message);
+    } else {
+        onError("An unknown error occurred while fetching the stream.");
+    }
     logger.error('Error fetching stream:', { error });
-    onError(error);
   } finally {
     onStreamEnd();
   }
@@ -113,8 +129,8 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
         logger.info(`LLM response finished for node ${id}`);
       },
       (error) => {
-        console.error('Error streaming LLM response:', error);
-        addMessageToNode(id, { role: 'model', content: 'Error: Could not get response.' });
+        // The error object here is now a string message
+        addMessageToNode(id, { role: 'model', content: `Error: ${error}` });
         setIsLoading(false);
         logger.error(`LLM response error for node ${id}`, { error });
       }

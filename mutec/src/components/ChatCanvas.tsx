@@ -23,6 +23,24 @@ const flowStyle = {
   background: '#000000',
 };
 
+// Custom styling for controls
+const controlsStyle = {
+  button: {
+    backgroundColor: 'transparent',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    padding: '4px',
+    margin: '2px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  path: {
+    fill: 'white',
+  }
+};
+
 export default function ChatCanvas() {
   const { nodes, edges, onNodesChange, onEdgesChange, activeNodeId, setActiveNodeId } = useChatStore();
   const [isSettingsOpen, setSettingsOpen] = useState(false);
@@ -38,8 +56,8 @@ export default function ChatCanvas() {
   );
 
   return (
-    <div className="w-screen h-screen flex flex-col" style={{ background: '#000000' }}>
-      <div className="flex-1 min-h-0">
+    <div className="w-full h-full" style={{ background: '#000000' }}>
+      <div className="h-full">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -62,7 +80,7 @@ export default function ChatCanvas() {
             className="opacity-30"
           />
           <Controls 
-            className="backdrop-blur-sm bg-black/20 border border-white/10 rounded-lg p-1" 
+            className="backdrop-blur-sm bg-black/30 border border-white/10 rounded-lg p-1"
           />
           <Panel position="top-right" className="m-4">
             <button 

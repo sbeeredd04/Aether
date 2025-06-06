@@ -83,19 +83,28 @@ body::before {
 }
 
 /* Flow Controls Styling */
-.controls-custom button {
-  background-color: var(--node-bg) !important;
-  color: var(--foreground) !important;
-  border: 1px solid var(--node-border) !important;
-  transition: background-color 0.2s ease;
+.react-flow__controls {
+  box-shadow: none !important;
 }
 
-.controls-custom button:hover {
-  background-color: rgba(0, 0, 0, 0.4) !important;
+.react-flow__controls button {
+  background-color: transparent !important;
+  color: white !important;
+  border: none !important;
+  width: 28px !important;
+  height: 28px !important;
+  transition: opacity 0.2s ease;
 }
 
-.controls-custom button path {
-  stroke: currentColor;
+.react-flow__controls button:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.react-flow__controls button svg {
+  fill: white !important;
+  stroke: white !important;
+  width: 14px !important;
+  height: 14px !important;
 }
 
 /* Edge and Connection Line Styles */

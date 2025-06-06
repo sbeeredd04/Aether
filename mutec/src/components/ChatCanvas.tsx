@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { 
   ReactFlow,
   Controls,
@@ -40,8 +40,16 @@ const controlsStyle = {
   }
 };
 
-export default function ChatCanvas({ isLoading = false }) {
-  const { nodes, edges, onNodesChange, onEdgesChange, activeNodeId, activePath } = useChatStore();
+const ChatCanvas: React.FC = () => {
+  const { 
+    nodes, 
+    edges, 
+    onNodesChange, 
+    onEdgesChange, 
+    activeNodeId, 
+    activePath,
+    chatManager 
+  } = useChatStore();
   const activeNode = nodes.find(n => n.id === activeNodeId);
 
   // Style edges based on whether they are part of the active path
@@ -70,8 +78,6 @@ export default function ChatCanvas({ isLoading = false }) {
 
   const handleConnect = useCallback(
     (params: any) => {
-      // This is a placeholder. In our current setup, edges are created
-      // programmatically when branching, not by user interaction.
       console.log('Connect event:', params);
     },
     []
@@ -81,13 +87,16 @@ export default function ChatCanvas({ isLoading = false }) {
     <div className="w-full h-full" style={{ background: '#000000' }}>
       <div className="h-full">
         <ReactFlow
-          nodes={nodes.map(node => ({
-            ...node,
-            data: {
-              ...node.data,
-              isLoading: isLoading && node.id === activeNodeId
-            }
-          }))}
+          nodes={nodes.map(node => {
+            const thread = chatManager?.getThread(node.id, node.data.chatHistory);
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                isLoading: thread?.isLoading || false
+              }
+            };
+          })}
           edges={styledEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -116,4 +125,6 @@ export default function ChatCanvas({ isLoading = false }) {
       {/* PromptBar removed from here */}
     </div>
   );
-} 
+};
+
+export default ChatCanvas; 

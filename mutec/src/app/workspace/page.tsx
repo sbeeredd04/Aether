@@ -125,7 +125,7 @@ export default function WorkspacePage() {
       <div className="flex flex-1 h-full">
         {/* Canvas area */}
         <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'pr-[10px]' : ''}`}>
-          <ChatCanvas isLoading={isLoading} />
+          <ChatCanvas />
         </div>
         
         {/* Sidebar area */}

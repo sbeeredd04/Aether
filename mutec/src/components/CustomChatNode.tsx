@@ -30,8 +30,14 @@ function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[
 function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isLoading?: boolean } }) {
   const isLoading = data.isLoading ?? false;
   const [input, setInput] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
-  const { addMessageToNode, createNodeAndEdge, getPathToNode, resetNode, deleteNodeAndDescendants } = useChatStore();
+  const { 
+    addMessageToNode, 
+    createNodeAndEdge, 
+    resetNode, 
+    deleteNodeAndDescendants,
+    sendMessageToNode,
+    initializeChatManager
+  } = useChatStore();
   const setActiveNodeId = useChatStore(s => s.setActiveNodeId);
   const activeNodeId = useChatStore(s => s.activeNodeId);
   const activePath = useChatStore(s => s.activePath);
@@ -41,6 +47,17 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
   const isInActivePath = activePath.nodeIds.includes(id);
   const nodeRef = useRef<HTMLDivElement>(null);
   const isRootNode = id === 'root';
+
+  // Initialize chat manager when component mounts
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('mutec-settings');
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      if (settings.apiKey) {
+        initializeChatManager(settings.apiKey);
+      }
+    }
+  }, [initializeChatManager]);
 
   // Set node as active when clicked
   useEffect(() => {
@@ -59,36 +76,20 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
 
   const handleAskLLM = useCallback(async () => {
     if (!input.trim()) return;
+    
     const userMessage: ChatMessage = { role: 'user', content: input };
     addMessageToNode(id, userMessage);
     setInput('');
-    const pathMessages = getPathToNode(id);
-    const history = pathMessages.map(msg => ({
-      role: msg.role,
-      parts: [{ text: msg.content }],
-    }));
+    
     try {
-      const savedSettings = localStorage.getItem('mutec-settings');
-      if (!savedSettings) throw new Error('API key not found. Please set it in the settings panel.');
-      const settings = JSON.parse(savedSettings);
-      const apiKey = settings.apiKey;
-      if (!apiKey) throw new Error('API key is empty. Please set it in the settings panel.');
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history, prompt: input, apiKey }),
-      });
-      const data = await response.json();
-      if (data.text) {
-        const modelMessage: ChatMessage = { role: 'model', content: data.text };
-        addMessageToNode(id, modelMessage, false);
-      } else if (data.error) {
-        addMessageToNode(id, { role: 'model', content: `Error: ${data.error}` });
-      }
+      await sendMessageToNode(id, input);
     } catch (error: any) {
-      addMessageToNode(id, { role: 'model', content: `Error: ${error.message || error}` });
+      addMessageToNode(id, { 
+        role: 'model', 
+        content: `Error: ${error.message || error}` 
+      });
     }
-  }, [id, input, addMessageToNode, getPathToNode]);
+  }, [id, input, addMessageToNode, sendMessageToNode]);
 
   const handleBranch = useCallback(() => {
     createNodeAndEdge(id, 'New Chat', 'branch');

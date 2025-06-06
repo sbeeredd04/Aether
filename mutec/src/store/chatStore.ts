@@ -10,6 +10,7 @@ import {
   EdgeChange,
 } from '@xyflow/react';
 import { nanoid } from 'nanoid';
+import { ChatManager } from '../utils/chatManager';
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -24,6 +25,7 @@ export type CustomNodeData = {
 interface ChatState {
   nodes: Node<CustomNodeData>[];
   edges: Edge[];
+  chatManager: ChatManager | null;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   addMessageToNode: (nodeId: string, message: ChatMessage, isPartial?: boolean) => void;
@@ -39,6 +41,8 @@ interface ChatState {
     edgeIds: string[];
   };
   setActiveNodeId: (nodeId: string | null) => void;
+  initializeChatManager: (apiKey: string) => void;
+  sendMessageToNode: (nodeId: string, message: string) => Promise<void>;
 }
 
 const ROOT_NODE: Node<CustomNodeData> = {
@@ -51,9 +55,34 @@ const ROOT_NODE: Node<CustomNodeData> = {
 export const useChatStore = create<ChatState>((set, get) => ({
   nodes: [ROOT_NODE],
   edges: [],
+  chatManager: null,
   activePath: {
     nodeIds: [],
     edgeIds: []
+  },
+
+  initializeChatManager: (apiKey: string) => {
+    set({ chatManager: new ChatManager(apiKey) });
+  },
+
+  sendMessageToNode: async (nodeId: string, message: string) => {
+    const state = get();
+    if (!state.chatManager) {
+      throw new Error('Chat manager not initialized');
+    }
+
+    const pathMessages = state.getPathToNode(nodeId);
+    const thread = state.chatManager.getThread(nodeId, pathMessages);
+    
+    try {
+      const response = await state.chatManager.sendMessage(nodeId, message);
+      state.addMessageToNode(nodeId, { role: 'model', content: response });
+    } catch (error) {
+      state.addMessageToNode(nodeId, { 
+        role: 'model', 
+        content: `Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}` 
+      });
+    }
   },
 
   onNodesChange: (changes) => {
@@ -62,7 +91,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   
       for (const change of changes) {
         if (change.type === 'remove') {
-          // Don't allow removing the root node
           if (change.id === 'root') continue;
           nodesToRemove.add(change.id);
         }
@@ -85,12 +113,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
   
         descendants.forEach((id) => nodesToRemove.add(id));
+        
+        // Clean up chat threads for removed nodes
+        nodesToRemove.forEach(id => {
+          state.chatManager?.deleteThread(id);
+        });
       }
   
       const remainingNodes = state.nodes.filter((node) => !nodesToRemove.has(node.id));
       const appliedChanges = applyNodeChanges(changes, remainingNodes);
       
-      // Ensure root node is always present
       if (!appliedChanges.some(node => node.id === 'root')) {
         appliedChanges.push(ROOT_NODE);
       }

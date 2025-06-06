@@ -51,14 +51,14 @@ export default function ChatCanvas() {
           style={flowStyle}
           minZoom={0.2}
           maxZoom={1.5}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.75 }}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
           nodesDraggable
         >
           <Background 
             variant={BackgroundVariant.Dots} 
             gap={20} 
             size={1} 
-            color="rgba(255, 255, 255, 0.2)"
+            color="rgba(255, 255, 255, 0.8)"
             className="opacity-30"
           />
           <Controls 

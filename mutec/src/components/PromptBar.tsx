@@ -139,6 +139,7 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
               pr-10
               leading-snug
               transition-all
+              scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent
             "
             placeholder="Type your message..."
             disabled={isLoading}
@@ -148,7 +149,7 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
                 handleAskLLM();
               }
             }}
-            style={{ lineHeight: 1.4 }}
+            style={{ lineHeight: 1.4, scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}
           />
         </div>
 

@@ -117,11 +117,11 @@ export default function NodeSidebar({
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto px-4">
+      <div className="flex-1 overflow-y-auto px-4 scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent" style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}>
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent"
-          style={{ scrollbarColor: 'rgba(255,255,255,0.7) transparent', scrollbarWidth: 'thin' }}
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent"
+          style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}
         >
           {threadMessages.length > 0 ? (
             threadMessages.map((msg, idx) => {
@@ -173,7 +173,7 @@ export default function NodeSidebar({
             </div>
           )}
         </div>
-        </div>
+      </div>
     </div>
   );
 } 

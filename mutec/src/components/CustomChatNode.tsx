@@ -1,11 +1,10 @@
 'use client';
 
-import React, { memo, useState, useCallback } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import React, { memo, useState, useCallback, useRef, useEffect } from 'react';
+import { Handle, Position, Node, Edge } from '@xyflow/react';
 import { useChatStore, CustomNodeData } from '../store/chatStore';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { FiPlay, FiGitBranch } from 'react-icons/fi';
+import { FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import { SiGooglegemini } from 'react-icons/si';
 import logger from '@/utils/logger';
 
 interface ChatMessage {
@@ -13,65 +12,63 @@ interface ChatMessage {
   content: string;
 }
 
-// Function to fetch and process the stream
-async function fetchStream(
-  history: any,
-  prompt: string,
-  onStreamUpdate: (chunk: string) => void,
-  onStreamEnd: () => void,
-  onError: (error: any) => void
-) {
-  try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ history, prompt }),
-    });
-
-    if (!response.body) {
-      throw new Error('Response body is null');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    logger.debug('Starting to read stream from API.');
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        logger.debug('Stream finished.');
-        break;
-      }
-
-      const decodedChunk = decoder.decode(value, { stream: true });
-      const lines = decodedChunk.split('\\n\\n');
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const json = JSON.parse(line.substring(6));
-            if (json.text) {
-              onStreamUpdate(json.text);
-            }
-          } catch (e) {
-            // Ignore parsing errors for incomplete JSON chunks
-          }
-        }
-      }
-    }
-  } catch (error) {
-    logger.error('Error fetching stream:', { error });
-    onError(error);
-  } finally {
-    onStreamEnd();
+function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[] {
+  // Returns an array of node IDs from root to targetId
+  const path: string[] = [];
+  let currentId: string | undefined = targetId;
+  const incoming = new Map<string, string>();
+  edges.forEach(e => incoming.set(e.target, e.source));
+  while (currentId) {
+    path.unshift(currentId);
+    currentId = incoming.get(currentId);
+    if (!currentId || currentId === 'root') break;
   }
+  if (currentId === 'root') path.unshift('root');
+  return path;
 }
 
-function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
+function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isLoading?: boolean } }) {
+  const isLoading = data.isLoading ?? false;
   const [input, setInput] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const { addMessageToNode, createNodeAndEdge, getPathToNode } = useChatStore();
+  const { 
+    addMessageToNode, 
+    createNodeAndEdge, 
+    resetNode, 
+    deleteNodeAndDescendants,
+    sendMessageToNode,
+    initializeChatManager
+  } = useChatStore();
+  const setActiveNodeId = useChatStore(s => s.setActiveNodeId);
+  const activeNodeId = useChatStore(s => s.activeNodeId);
+  const activePath = useChatStore(s => s.activePath);
+  const nodes = useChatStore(s => s.nodes);
+  const edges = useChatStore(s => s.edges);
+  const isActive = activeNodeId === id;
+  const isInActivePath = activePath.nodeIds.includes(id);
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const isRootNode = id === 'root';
+
+  // Initialize chat manager when component mounts
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('mutec-settings');
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      if (settings.apiKey) {
+        initializeChatManager(settings.apiKey);
+      }
+    }
+  }, [initializeChatManager]);
+
+  // Set node as active when clicked
+  useEffect(() => {
+    if (isActive && nodeRef.current) {
+      nodeRef.current.focus();
+    }
+  }, [isActive]);
+
+  const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
+  const lastModelResponse = data.chatHistory.find(msg => msg.role === 'model')?.content || '';
+  const lastUserMessage = data.chatHistory.find(msg => msg.role === 'user')?.content || '';
 
   const handleInputChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(evt.target.value);
@@ -79,106 +76,162 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
 
   const handleAskLLM = useCallback(async () => {
     if (!input.trim()) return;
-
-    logger.info(`Asking LLM for node ${id}`, { prompt: input });
-    setIsLoading(true);
+    
     const userMessage: ChatMessage = { role: 'user', content: input };
     addMessageToNode(id, userMessage);
     setInput('');
-
-    const pathMessages = getPathToNode(id);
-    const history = pathMessages.map(msg => ({
-      role: msg.role,
-      parts: [{ text: msg.content }],
-    }));
-
-    logger.debug(`Context for node ${id}:`, { history });
-
-    let fullResponse = '';
-    let lastMessageId: string | null = null;
-
-    await fetchStream(
-      history,
-      input,
-      (chunk) => {
-        fullResponse += chunk;
-        const modelMessage: ChatMessage = { role: 'model', content: fullResponse };
-        addMessageToNode(id, modelMessage, true);
-        logger.debug(`Stream chunk received for node ${id}`, { chunk });
-      },
-      () => {
-        const finalModelMessage: ChatMessage = { role: 'model', content: fullResponse };
-        addMessageToNode(id, finalModelMessage, false);
-        setIsLoading(false);
-        logger.info(`LLM response finished for node ${id}`);
-      },
-      (error) => {
-        console.error('Error streaming LLM response:', error);
-        addMessageToNode(id, { role: 'model', content: 'Error: Could not get response.' });
-        setIsLoading(false);
-        logger.error(`LLM response error for node ${id}`, { error });
-      }
-    );
-  }, [id, input, addMessageToNode, getPathToNode]);
+    
+    try {
+      await sendMessageToNode(id, input);
+    } catch (error: any) {
+      addMessageToNode(id, { 
+        role: 'model', 
+        content: `Error: ${error.message || error}` 
+      });
+    }
+  }, [id, input, addMessageToNode, sendMessageToNode]);
 
   const handleBranch = useCallback(() => {
-    logger.info(`Branching from node ${id}`);
-    createNodeAndEdge(id, 'New Branch', 'branch');
+    createNodeAndEdge(id, 'New Chat', 'branch');
   }, [id, createNodeAndEdge]);
 
+  const handleReset = useCallback(() => {
+    resetNode(id);
+  }, [id, resetNode]);
+
+  const handleDelete = useCallback(() => {
+    deleteNodeAndDescendants(id);
+  }, [id, deleteNodeAndDescendants]);
+
+  const handleNodeClick = (e: React.MouseEvent) => {
+    setActiveNodeId(id);
+  };
+
+  // Helper for model name (default Gemini)
+  const getModelName = () => 'Gemini 2.0 Flash';
+  const isGeminiModel = (model?: string) => (model || 'gemini-2.0-flash').toLowerCase().includes('gemini');
+
+  // Responsive node class
+  const nodeClass = `
+    backdrop-blur-sm 
+    ${isActive ? 'bg-neutral-900/30' : 'bg-black/0'}
+    ${isInActivePath ? 'border-purple-500' : 'border-white/10'}
+    border 
+    shadow-lg 
+    rounded-xl 
+    p-4 
+    transition-all 
+    ${isActive ? 'ring-2 ring-purple-500' : ''} 
+    ${isInActivePath && !isActive ? 'ring-1 ring-purple-400/50' : ''}
+  `;
+  
+  const iconButtonClass = 'hover:text-white text-gray-300 transition-colors';
+
+  // Loading dots animation
+  const LoadingDots = () => (
+    <span className="flex gap-1 items-center h-6">
+      <span className="bg-white/80 rounded-full w-2 h-2 animate-bounce [animation-delay:0ms]"></span>
+      <span className="bg-white/60 rounded-full w-2 h-2 animate-bounce [animation-delay:150ms]"></span>
+      <span className="bg-white/40 rounded-full w-2 h-2 animate-bounce [animation-delay:300ms]"></span>
+    </span>
+  );
+
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-300 w-96 dark:bg-gray-800 dark:border-gray-700">
-      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-teal-500" />
-      <div className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">{data.label}</div>
-      <div className="max-h-60 overflow-y-auto mb-4 border p-2 rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
-        {data.chatHistory.map((msg, index) => (
-          <div key={index} className={`mb-2 ${msg.role === 'user' ? 'text-blue-600' : 'text-gray-800 dark:text-gray-200'}`}>
-            <strong className="font-semibold">{msg.role === 'user' ? 'You:' : 'AI:'}</strong>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              {msg.content.split('```').map((part, i) =>
-                i % 2 === 1 ? (
-                  <SyntaxHighlighter key={i} language="javascript" style={vscDarkPlus} customStyle={{ margin: '0', padding: '0.5rem' }}>
-                    {part}
-                  </SyntaxHighlighter>
-                ) : (
-                  <span key={i}>{part}</span>
-                )
-              )}
-            </div>
-          </div>
-        ))}
-        {isLoading && <div className="text-gray-500 italic dark:text-gray-400">AI is thinking...</div>}
-      </div>
-      <textarea
-        value={input}
-        onChange={handleInputChange}
-        className="w-full p-2 border rounded-md mb-2 resize-y bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
-        placeholder="Type your message..."
-        rows={3}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleAskLLM();
-          }
-        }}
+    <div
+      ref={nodeRef}
+      className={nodeClass}
+      onClick={handleNodeClick}
+      tabIndex={0}
+      style={{ 
+        position: 'relative', 
+        width: 450,
+        height: 200
+      }}
+    >
+      {/* Root node indicator - glowing circle */}
+      {isRootNode && (
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
+          <div className="w-6 h-6 rounded-full bg-purple-500 animate-pulse shadow-[0_0_10px_4px_rgba(168,85,247,0.4)] mb-1"></div>
+          <div className="w-[2px] h-5 bg-purple-500/50"></div>
+        </div>
+      )}
+      
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        className={`w-2 h-2 ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
       />
-      <div className="flex justify-between gap-2">
-        <button
-          onClick={handleAskLLM}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
-          disabled={isLoading}
-        >
-          <FiPlay /> Ask LLM
-        </button>
-        <button
-          onClick={handleBranch}
-          className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 disabled:opacity-50 flex items-center gap-2"
-          disabled={isLoading}
-        >
-          <FiGitBranch /> Branch
-        </button>
+      <div className="flex justify-between items-center mb-3">
+        <div className="font-medium text-base truncate flex-1 text-white group relative">
+          <div className="flex items-center gap-2">
+            {isRootNode ? (
+              <span className="text-purple-400">Root Node</span>
+            ) : (
+              <>
+                <span className="text-white/90">{data.label || 'New Chat'}</span>
+                {data.chatHistory.length > 0 && (
+                  <span className="text-xs text-white/50">
+                    ({data.chatHistory.length} messages)
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          {/* Tooltip for long titles */}
+          {data.label && data.label.length > 30 && (
+            <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50">
+              {data.label}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {hasResponse && (
+            <button 
+              onClick={handleBranch} 
+              className={iconButtonClass}
+              title="Branch Chat"
+            >
+              <FiPlus size={16} />
+            </button>
+          )}
+          <button onClick={handleReset} className={iconButtonClass} title="Reset Node">
+            <FiRefreshCw size={16} />
+          </button>
+          {!isRootNode && (
+            <button onClick={handleDelete} className="text-red-300 hover:text-red-200" title="Delete Node">
+              <FiTrash2 size={16} />
+            </button>
+          )}
+        </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-teal-500" />
+      {hasResponse ? (
+        <div className="relative">
+          <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent"
+            style={{ scrollbarColor: 'rgba(255,255,255,0.7) transparent', scrollbarWidth: 'thin' }}
+          >
+            {lastModelResponse}
+            {/* Gemini logo at bottom right if Gemini model */}
+            {isGeminiModel() && (
+              <div className="absolute bottom-2 right-2 group" title={getModelName()}>
+                <span className="group-hover:scale-110 transition-transform cursor-pointer">
+                  <SiGooglegemini size={20} className="text-blue-300 drop-shadow-md" />
+                </span>
+              </div>
+            )}
+            {/* Loading animation if isLoading */}
+            {isLoading && (
+              <div className="absolute bottom-2 left-2">
+                <LoadingDots />
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        className={`w-2 h-2 ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
+      />
     </div>
   );
 }

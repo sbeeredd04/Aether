@@ -1,9 +1,30 @@
 @import "tailwindcss";
 
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --accent-1: rgba(147, 112, 219, 0.2);
+  --accent-2: rgba(0, 191, 255, 0.2);
+  --node-bg: rgba(255, 255, 255, 0.1);
+  --node-border: rgba(255, 255, 255, 0.1);
+  --glass-blur: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #000000;
+    --foreground: #ffffff;
+    --accent-1: rgba(147, 112, 219, 0.2);
+    --accent-2: rgba(0, 191, 255, 0.2);
+    --node-bg: rgba(255, 255, 255, 0.05);
+    --node-border: rgba(255, 255, 255, 0.1);
+  }
+}
+
 body {
-  color: white;
-  background: #000;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 body::before {
@@ -13,15 +34,91 @@ body::before {
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at 70% 20%, rgba(147, 112, 219, 0.2), transparent 40%),
-              radial-gradient(circle at 30% 80%, rgba(0, 191, 255, 0.2), transparent 40%);
+  background: 
+    radial-gradient(circle at 70% 20%, var(--accent-1), transparent 40%),
+    radial-gradient(circle at 30% 80%, var(--accent-2), transparent 40%);
   z-index: -1;
+  pointer-events: none;
 }
 
 .glass-morphism {
-  background: rgba(255, 255, 255, 0.05);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--node-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--node-border);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: currentColor;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { 
+    transform: scale(0);
+    opacity: 0.3;
+  }
+  40% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-fullscreen {
+  @apply fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  @apply w-full max-w-4xl mx-auto rounded-xl p-4 sm:p-6 md:p-8;
+  max-height: 90vh;
+  min-height: 50vh;
+}
+
+/* Flow Controls Styling */
+.controls-custom button {
+  background-color: var(--node-bg) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--node-border) !important;
+  transition: background-color 0.2s ease;
+}
+
+.controls-custom button:hover {
+  background-color: var(--node-bg) !important;
+  opacity: 0.8;
+}
+
+.controls-custom button path {
+  stroke: currentColor;
+}
+
+/* Edge and Connection Line Styles */
+.react-flow__edge path,
+.react-flow__connection-path {
+  stroke: var(--foreground);
+  stroke-opacity: 0.3;
+}
+
+.react-flow__edge.selected path {
+  stroke: var(--accent-1);
+  stroke-opacity: 1;
+}
+
+/* Node Selection Styles */
+.react-flow__node.selected {
+  box-shadow: 0 0 0 2px var(--accent-1);
 }

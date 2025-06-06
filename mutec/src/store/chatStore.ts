@@ -29,17 +29,18 @@ interface ChatState {
   addMessageToNode: (nodeId: string, message: ChatMessage, isPartial?: boolean) => void;
   createNodeAndEdge: (sourceNodeId: string, label: string, type: 'response' | 'branch') => void;
   getPathToNode: (targetNodeId: string) => ChatMessage[];
+  resetNode: (nodeId: string) => void;
 }
 
+const ROOT_NODE: Node<CustomNodeData> = {
+  id: 'root',
+  type: 'chatNode',
+  data: { label: 'Start your conversation', chatHistory: [] },
+  position: { x: 250, y: 50 },
+};
+
 export const useChatStore = create<ChatState>((set, get) => ({
-  nodes: [
-    {
-      id: 'start-node',
-      type: 'chatNode',
-      data: { label: 'Start your conversation:', chatHistory: [] },
-      position: { x: 250, y: 50 },
-    },
-  ],
+  nodes: [ROOT_NODE],
   edges: [],
 
   onNodesChange: (changes) => {
@@ -48,6 +49,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   
       for (const change of changes) {
         if (change.type === 'remove') {
+          // Don't allow removing the root node
+          if (change.id === 'root') continue;
           nodesToRemove.add(change.id);
         }
       }
@@ -73,16 +76,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
   
       const remainingNodes = state.nodes.filter((node) => !nodesToRemove.has(node.id));
       const appliedChanges = applyNodeChanges(changes, remainingNodes);
+      
+      // Ensure root node is always present
+      if (!appliedChanges.some(node => node.id === 'root')) {
+        appliedChanges.push(ROOT_NODE);
+      }
   
       return {
-        nodes: appliedChanges as any,
+        nodes: appliedChanges as Node<CustomNodeData>[],
         edges: state.edges.filter((edge) => !nodesToRemove.has(edge.source) && !nodesToRemove.has(edge.target)),
       };
     });
   },
+
   onEdgesChange: (changes) => {
     set({
       edges: applyEdgeChanges(changes, get().edges),
+    });
+  },
+
+  resetNode: (nodeId: string) => {
+    set((state) => {
+      // Find all descendant nodes
+      const nodesToRemove = new Set<string>();
+      const queue = [nodeId];
+
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        state.edges.forEach((edge) => {
+          if (edge.source === currentId) {
+            nodesToRemove.add(edge.target);
+            queue.push(edge.target);
+          }
+        });
+      }
+
+      // Reset the target node and remove its descendants
+      return {
+        nodes: state.nodes.map(node => 
+          node.id === nodeId 
+            ? { ...node, data: { ...node.data, chatHistory: [], label: 'New Chat' } }
+            : node
+        ).filter(node => !nodesToRemove.has(node.id)),
+        edges: state.edges.filter(edge => 
+          !nodesToRemove.has(edge.target) && !nodesToRemove.has(edge.source)
+        ),
+      };
     });
   },
 
@@ -151,7 +190,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
-  getPathToNode: (targetNodeId: string): ChatMessage[] => {
+  getPathToNode: (targetNodeId) => {
     const { nodes, edges } = get();
     const pathMessages: ChatMessage[] = [];
     let currentNodeId: string | undefined = targetNodeId;
@@ -164,12 +203,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     while (currentNodeId) {
       const currentNode = nodes.find((n) => n.id === currentNodeId);
       if (currentNode?.data.chatHistory) {
-        // Add messages in reverse order and then reverse the whole array at the end
-        pathMessages.push(...[...currentNode.data.chatHistory].reverse());
+        pathMessages.push(...currentNode.data.chatHistory);
       }
       currentNodeId = incomingEdgesMap.get(currentNodeId);
     }
     
-    return pathMessages.reverse();
+    return pathMessages;
   },
 })); 

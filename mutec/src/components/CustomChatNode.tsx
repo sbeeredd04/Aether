@@ -5,7 +5,7 @@ import { Handle, Position } from '@xyflow/react';
 import { useChatStore, CustomNodeData } from '../store/chatStore';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { FiPlay, FiGitBranch } from 'react-icons/fi';
+import { FiMessageSquare, FiPlus, FiMaximize, FiX } from 'react-icons/fi';
 import logger from '@/utils/logger';
 
 interface ChatMessage {
@@ -87,7 +87,10 @@ async function fetchStream(
 function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   const [input, setInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const { addMessageToNode, createNodeAndEdge, getPathToNode } = useChatStore();
+
+  const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
 
   const handleInputChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(evt.target.value);
@@ -142,18 +145,58 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
     createNodeAndEdge(id, 'New Branch', 'branch');
   }, [id, createNodeAndEdge]);
 
+  const toggleFullScreen = () => setIsFullScreen(!isFullScreen);
+
+  if (isFullScreen) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center">
+        <div className="glass-morphism rounded-lg shadow-lg w-3/4 h-3/4 p-4 flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-semibold text-lg">{data.label}</h2>
+            <button onClick={toggleFullScreen} className="p-2 rounded-full hover:bg-white hover:bg-opacity-20">
+              <FiX size={24} />
+            </button>
+          </div>
+          <div className="flex-grow overflow-y-auto p-2 rounded bg-black bg-opacity-20">
+            {data.chatHistory.map((msg, index) => (
+              <div key={index} className={`mb-2 ${msg.role === 'user' ? 'text-blue-300' : 'text-gray-200'}`}>
+                <strong className="font-semibold">{msg.role === 'user' ? 'You:' : 'AI:'}</strong>
+                <div className="prose prose-sm prose-invert max-w-none">
+                  {msg.content.split('```').map((part, i) =>
+                    i % 2 === 1 ? (
+                      <SyntaxHighlighter key={i} language="javascript" style={vscDarkPlus} customStyle={{ margin: '0', padding: '0.5rem', background: '#1e1e1e' }}>
+                        {part}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <span key={i}>{part}</span>
+                    )
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-300 w-96 dark:bg-gray-800 dark:border-gray-700">
-      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-teal-500" />
-      <div className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">{data.label}</div>
-      <div className="max-h-60 overflow-y-auto mb-4 border p-2 rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
+    <div className="glass-morphism p-4 rounded-xl shadow-lg w-96 text-white">
+      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-cyan-400" />
+      <div className="flex justify-between items-center mb-2">
+        <div className="font-bold text-lg">{data.label}</div>
+        <button onClick={toggleFullScreen} className="p-1 rounded-full hover:bg-white hover:bg-opacity-20">
+            <FiMaximize size={16} />
+        </button>
+      </div>
+      <div className="max-h-60 overflow-y-auto mb-4 p-2 rounded bg-black bg-opacity-20">
         {data.chatHistory.map((msg, index) => (
-          <div key={index} className={`mb-2 ${msg.role === 'user' ? 'text-blue-600' : 'text-gray-800 dark:text-gray-200'}`}>
+          <div key={index} className={`mb-2 ${msg.role === 'user' ? 'text-blue-300' : 'text-gray-200'}`}>
             <strong className="font-semibold">{msg.role === 'user' ? 'You:' : 'AI:'}</strong>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
+            <div className="prose prose-sm prose-invert max-w-none">
               {msg.content.split('```').map((part, i) =>
                 i % 2 === 1 ? (
-                  <SyntaxHighlighter key={i} language="javascript" style={vscDarkPlus} customStyle={{ margin: '0', padding: '0.5rem' }}>
+                  <SyntaxHighlighter key={i} language="javascript" style={vscDarkPlus} customStyle={{ margin: '0', padding: '0.5rem', background: '#1e1e1e' }}>
                     {part}
                   </SyntaxHighlighter>
                 ) : (
@@ -163,38 +206,45 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
             </div>
           </div>
         ))}
-        {isLoading && <div className="text-gray-500 italic dark:text-gray-400">AI is thinking...</div>}
+        {isLoading && <div className="text-gray-400 italic">AI is thinking...</div>}
       </div>
-      <textarea
-        value={input}
-        onChange={handleInputChange}
-        className="w-full p-2 border rounded-md mb-2 resize-y bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
-        placeholder="Type your message..."
-        rows={3}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleAskLLM();
-          }
-        }}
-      />
-      <div className="flex justify-between gap-2">
-        <button
-          onClick={handleAskLLM}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
-          disabled={isLoading}
-        >
-          <FiPlay /> Ask LLM
-        </button>
+      
+      {!hasResponse && (
+        <>
+            <textarea
+                value={input}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded-md mb-2 resize-y bg-black bg-opacity-20 border-gray-600 placeholder-gray-400"
+                placeholder="Type your message..."
+                rows={3}
+                onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAskLLM();
+                }
+                }}
+            />
+            <button
+                onClick={handleAskLLM}
+                className="w-full px-4 py-2 bg-blue-500 bg-opacity-50 text-white rounded-md hover:bg-opacity-75 disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={isLoading}
+            >
+                <FiMessageSquare /> Ask
+            </button>
+        </>
+      )}
+
+      {hasResponse && (
         <button
           onClick={handleBranch}
-          className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 disabled:opacity-50 flex items-center gap-2"
+          className="w-full mt-2 px-4 py-2 bg-purple-500 bg-opacity-50 text-white rounded-md hover:bg-opacity-75 disabled:opacity-50 flex items-center justify-center gap-2"
           disabled={isLoading}
         >
-          <FiGitBranch /> Branch
+          <FiPlus /> New Branch
         </button>
-      </div>
-      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-teal-500" />
+      )}
+      
+      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-cyan-400" />
     </div>
   );
 }

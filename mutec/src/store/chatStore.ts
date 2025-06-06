@@ -16,10 +16,10 @@ export interface ChatMessage {
   content: string;
 }
 
-export interface CustomNodeData {
+export type CustomNodeData = {
   label: string;
   chatHistory: ChatMessage[];
-}
+};
 
 interface ChatState {
   nodes: Node<CustomNodeData>[];
@@ -43,8 +43,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
   edges: [],
 
   onNodesChange: (changes) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes) as Node<CustomNodeData>[],
+    set((state) => {
+      const nodesToRemove = new Set<string>();
+  
+      for (const change of changes) {
+        if (change.type === 'remove') {
+          nodesToRemove.add(change.id);
+        }
+      }
+  
+      if (nodesToRemove.size > 0) {
+        const descendants = new Set<string>();
+        const queue = [...nodesToRemove];
+  
+        while (queue.length > 0) {
+          const currentId = queue.shift()!;
+          state.edges.forEach((edge) => {
+            if (edge.source === currentId) {
+              if (!descendants.has(edge.target)) {
+                descendants.add(edge.target);
+                queue.push(edge.target);
+              }
+            }
+          });
+        }
+  
+        descendants.forEach((id) => nodesToRemove.add(id));
+      }
+  
+      const remainingNodes = state.nodes.filter((node) => !nodesToRemove.has(node.id));
+      const appliedChanges = applyNodeChanges(changes, remainingNodes);
+  
+      return {
+        nodes: appliedChanges as any,
+        edges: state.edges.filter((edge) => !nodesToRemove.has(edge.source) && !nodesToRemove.has(edge.target)),
+      };
     });
   },
   onEdgesChange: (changes) => {
@@ -69,10 +102,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 )
               : [...node.data.chatHistory, message];
 
+          let newLabel = node.data.label;
+          if (message.role === 'model' && !isPartial && message.content) {
+            newLabel = message.content.substring(0, 30) + (message.content.length > 30 ? '...' : '');
+          } else if (message.role === 'user' && !isPartial && message.content) {
+            newLabel = `User: ${message.content.substring(0, 20)}...`;
+          }
+
           return {
             ...node,
             data: {
               ...node.data,
+              label: newLabel,
               chatHistory: updatedChatHistory,
             },
           };

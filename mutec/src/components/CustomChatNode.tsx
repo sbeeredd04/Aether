@@ -135,9 +135,19 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
         height: 200
       }}
     >
+      {/* Root node indicator - glowing circle */}
+      {isRootNode && (
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
+          <div className="w-6 h-6 rounded-full bg-purple-500 animate-pulse shadow-[0_0_10px_4px_rgba(168,85,247,0.4)] mb-1"></div>
+          <div className="w-[2px] h-5 bg-purple-500/50"></div>
+        </div>
+      )}
+      
       <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-neutral-400" />
       <div className="flex justify-between items-center mb-3">
-        <div className="font-medium text-base truncate flex-1 text-white">{data.label || 'New Chat'}</div>
+        <div className="font-medium text-base truncate flex-1 text-white">
+          {isRootNode ? 'Root Node' : (data.label || 'New Chat')}
+        </div>
         <div className="flex gap-2">
           {hasResponse && (
             <button 

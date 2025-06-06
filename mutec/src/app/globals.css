@@ -1,25 +1,14 @@
 @import "tailwindcss";
-/* Custom CSS variables for light and dark themes */
+/* CSS variables for dark theme only */
 :root {
-  --background: #f7fafd;
-  --foreground: #171717;
-  --accent-1: rgba(147, 112, 219, 0.18);
-  --accent-2: rgba(0, 191, 255, 0.13);
-  --node-bg: rgba(255, 255, 255, 0.65);
-  --node-border: rgba(200, 200, 255, 0.18);
-  --glass-blur: 18px;
-}
-
-@media (prefers-color-scheme: dark), (html.dark) {
-  :root {
-    --background: #10131a;
-    --foreground: #f3f3f3;
-    --accent-1: rgba(147, 112, 219, 0.22);
-    --accent-2: rgba(0, 191, 255, 0.18);
-    --node-bg: rgba(18, 22, 34, 0.82);
-    --node-border: rgba(40, 40, 60, 0.32);
-    --glass-blur: 22px;
-  }
+  --background: #000000;
+  --foreground: #f3f3f3;
+  --foreground-muted: #a0a0a0;
+  --accent-1: rgba(147, 112, 219, 0.22);
+  --accent-2: rgba(0, 191, 255, 0.18);
+  --node-bg: rgba(0, 0, 0, 0.2);
+  --node-border: rgba(255, 255, 255, 0.1);
+  --glass-blur: 8px;
 }
 
 body {
@@ -41,13 +30,13 @@ body::before {
     radial-gradient(circle at 30% 80%, var(--accent-2), transparent 40%);
   z-index: -1;
   pointer-events: none;
+  opacity: 0.5;
 }
 
 .glass-morphism {
   background: var(--node-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  border: 1.5px solid var(--node-border);
+  border: 1px solid var(--node-border);
   box-shadow: 0 6px 32px rgba(0, 0, 0, 0.10);
 }
 
@@ -102,8 +91,7 @@ body::before {
 }
 
 .controls-custom button:hover {
-  background-color: var(--node-bg) !important;
-  opacity: 0.8;
+  background-color: rgba(0, 0, 0, 0.4) !important;
 }
 
 .controls-custom button path {
@@ -124,5 +112,5 @@ body::before {
 
 /* Node Selection Styles */
 .react-flow__node.selected {
-  box-shadow: 0 0 0 2px var(--accent-1);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }

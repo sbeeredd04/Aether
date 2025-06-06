@@ -20,11 +20,11 @@ import PromptBar from './PromptBar';
 const nodeTypes = { chatNode: CustomChatNode };
 
 const flowStyle = {
-  background: 'var(--background)',
+  background: '#000000',
 };
 
 export default function ChatCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, theme, setTheme, activeNodeId, setActiveNodeId } = useChatStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, activeNodeId, setActiveNodeId } = useChatStore();
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const activeNode = nodes.find(n => n.id === activeNodeId);
 
@@ -38,7 +38,7 @@ export default function ChatCanvas() {
   );
 
   return (
-    <div className="w-screen h-screen flex flex-col" style={{ background: 'var(--background)' }}>
+    <div className="w-screen h-screen flex flex-col" style={{ background: '#000000' }}>
       <div className="flex-1 min-h-0">
         <ReactFlow
           nodes={nodes}
@@ -52,19 +52,22 @@ export default function ChatCanvas() {
           minZoom={0.2}
           maxZoom={1.5}
           defaultViewport={{ x: 0, y: 0, zoom: 0.75 }}
+          nodesDraggable
         >
           <Background 
             variant={BackgroundVariant.Dots} 
-            gap={16} 
-            size={1.5} 
-            color="currentColor"
-            className="opacity-10 dark:opacity-5"
+            gap={20} 
+            size={1} 
+            color="rgba(255, 255, 255, 0.2)"
+            className="opacity-30"
           />
-          <Controls className="glass-morphism !bg-transparent controls-custom" />
+          <Controls 
+            className="backdrop-blur-sm bg-black/20 border border-white/10 rounded-lg p-1" 
+          />
           <Panel position="top-right" className="m-4">
             <button 
               onClick={() => setSettingsOpen(true)}
-              className="glass-morphism p-2 rounded-2xl hover:bg-white hover:bg-opacity-20 transition-colors"
+              className="text-white/80 hover:text-white transition-colors"
               aria-label="Open Settings"
             >
               <FiSettings size={22} />

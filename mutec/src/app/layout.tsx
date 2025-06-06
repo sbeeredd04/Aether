@@ -15,10 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mutec - AI Chat Interface",
   description: "A modern chat interface powered by Gemini AI",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
-  ],
+  themeColor: "#10131a",
 };
 
 export default function RootLayout({
@@ -27,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
       >

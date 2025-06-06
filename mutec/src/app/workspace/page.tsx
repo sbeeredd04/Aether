@@ -2,8 +2,8 @@ import ChatCanvas from '@/components/ChatCanvas';
 
 export default function WorkspacePage() {
   return (
-    <div>
+    <main className="bg-[#10131a]">
       <ChatCanvas />
-    </div>
+    </main>
   );
 } 

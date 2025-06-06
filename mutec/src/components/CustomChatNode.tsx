@@ -1,9 +1,9 @@
 'use client';
 
-import React, { memo, useState, useCallback, useRef } from 'react';
+import React, { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { Handle, Position, Node, Edge } from '@xyflow/react';
 import { useChatStore, CustomNodeData } from '../store/chatStore';
-import { FiSend, FiPlus, FiMaximize2, FiX, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import { FiSend, FiPlus, FiMaximize2, FiX, FiRefreshCw, FiTrash2, FiHome } from 'react-icons/fi';
 import logger from '@/utils/logger';
 
 interface ChatMessage {
@@ -39,34 +39,49 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   const pathNodeIds = activeNodeId ? getPathNodeIds(nodes, edges, activeNodeId) : [];
   const isActive = activeNodeId === id;
   const isPath = pathNodeIds.includes(id);
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const isRootNode = id === 'root';
 
   // Resizing state
-  const [size, setSize] = useState({ width: 420, height: 180 });
+  const [size, setSize] = useState({ width: 450, height: 200 });
   const resizing = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
-  const startSize = useRef({ width: 420, height: 180 });
+  const startSize = useRef({ width: 450, height: 200 });
+  const isResizing = useRef(false);
+
+  // Set node as active when clicked
+  useEffect(() => {
+    if (isActive && nodeRef.current) {
+      nodeRef.current.focus();
+    }
+  }, [isActive]);
 
   const onResizeMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     e.stopPropagation();
+    isResizing.current = true;
     resizing.current = true;
     startPos.current = { x: e.clientX, y: e.clientY };
     startSize.current = { ...size };
-    document.addEventListener('mousemove', onResizeMouseMove as EventListener);
-    document.addEventListener('mouseup', onResizeMouseUp as EventListener);
-  };
-  const onResizeMouseMove = (e: MouseEvent) => {
-    if (!resizing.current) return;
-    const dx = e.clientX - startPos.current.x;
-    const dy = e.clientY - startPos.current.y;
-    setSize({
-      width: Math.max(320, Math.min(700, startSize.current.width + dx)),
-      height: Math.max(120, Math.min(600, startSize.current.height + dy)),
-    });
-  };
-  const onResizeMouseUp = () => {
-    resizing.current = false;
-    document.removeEventListener('mousemove', onResizeMouseMove as EventListener);
-    document.removeEventListener('mouseup', onResizeMouseUp as EventListener);
+    
+    const onMouseMove = (e: MouseEvent) => {
+      if (!resizing.current) return;
+      const dx = e.clientX - startPos.current.x;
+      const dy = e.clientY - startPos.current.y;
+      setSize({
+        width: Math.max(350, Math.min(800, startSize.current.width + dx)),
+        height: Math.max(140, Math.min(600, startSize.current.height + dy)),
+      });
+    };
+    
+    const onMouseUp = () => {
+      resizing.current = false;
+      isResizing.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   };
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
@@ -127,55 +142,84 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
 
   const toggleFullScreen = () => setIsFullScreen(!isFullScreen);
 
+  const handleNodeClick = (e: React.MouseEvent) => {
+    if (!isResizing.current) {
+      setActiveNodeId(id);
+    }
+  };
+
   // Responsive node class
-  const nodeClass =
-    `glass-morphism bg-white/60 dark:bg-black/40 border border-white/30 dark:border-black/30 shadow-2xl rounded-3xl p-6 transition-all backdrop-blur-xl ` +
-    (isActive ? 'ring-2 ring-blue-400 dark:ring-blue-600 ' : '') +
-    (isPath && !isActive ? 'border-2 border-gradient-to-r from-blue-400 via-blue-300 to-blue-500 dark:from-blue-600 dark:to-blue-400 ' : '');
-  const buttonClass =
-    'rounded-full p-2 bg-white/30 dark:bg-black/30 hover:bg-white/50 dark:hover:bg-black/50 transition-colors';
-  const inputClass =
-    'w-full rounded-2xl border border-gray-300 dark:border-gray-700 bg-white/40 dark:bg-black/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-600 placeholder-gray-500 dark:placeholder-gray-400';
-  const selectClass =
-    'w-full mb-2 p-2 rounded-2xl bg-white/40 dark:bg-black/30 border border-gray-300 dark:border-gray-700 text-sm';
+  const nodeClass = `
+    backdrop-blur-sm 
+    ${isActive ? 'bg-neutral-900/30' : 'bg-black/20'}
+    border border-white/10
+    shadow-lg 
+    rounded-xl 
+    p-4 
+    transition-all 
+    ${isActive ? 'ring-1 ring-neutral-500' : ''} 
+    ${isPath && !isActive ? 'border-neutral-500/30' : ''}
+  `;
+  
+  const iconButtonClass = 'hover:text-white text-gray-300 transition-colors';
+  const inputClass = 'w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-neutral-500 placeholder-gray-400';
+  const selectClass = 'w-full mb-2 p-2 rounded-xl bg-black/20 border border-white/10 text-sm';
 
   if (isFullScreen) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/70">
-        <div className={nodeClass + ' max-w-2xl w-full p-10'} style={{ position: 'relative' }}>
-          <button onClick={toggleFullScreen} className="absolute top-4 right-4 {buttonClass}"><FiX size={28} /></button>
-          <div className="flex justify-between items-center mb-4">
-            <div className="font-medium text-2xl truncate flex-1">{data.label || 'New Chat'}</div>
-            <div className="flex gap-2">
-              <button onClick={handleReset} className={buttonClass} title="Reset Node">
-                <FiRefreshCw size={22} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div 
+          className="max-w-3xl w-full p-6 rounded-xl backdrop-blur-sm bg-neutral-900/30 border border-white/10 shadow-2xl"
+          style={{ position: 'relative', maxHeight: '85vh', overflowY: 'auto' }}
+        >
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button onClick={() => setActiveNodeId('root')} className={iconButtonClass} title="Go to Root">
+              <FiHome size={20} />
+            </button>
+            <button onClick={toggleFullScreen} className={iconButtonClass} title="Close">
+              <FiX size={24} />
+            </button>
+          </div>
+          
+          <div className="mb-6">
+            <h2 className="font-medium text-xl text-white mb-1">{data.label || 'New Chat'}</h2>
+            <div className="flex gap-2 mt-3">
+              {hasResponse && (
+                <button 
+                  onClick={handleBranch} 
+                  className="text-purple-300 hover:text-purple-200 flex items-center gap-1"
+                  title="Branch Chat"
+                >
+                  <FiPlus size={16} /> Branch
+                </button>
+              )}
+              <button onClick={handleReset} className="text-blue-300 hover:text-blue-200 flex items-center gap-1" title="Reset Node">
+                <FiRefreshCw size={16} /> Reset
               </button>
-              <button onClick={handleDelete} className={buttonClass + ' bg-red-500/70 hover:bg-red-600/80 text-white'} title="Delete Node">
-                <FiTrash2 size={22} />
-              </button>
+              {!isRootNode && (
+                <button onClick={handleDelete} className="text-red-300 hover:text-red-200 flex items-center gap-1" title="Delete Node">
+                  <FiTrash2 size={16} /> Delete
+                </button>
+              )}
             </div>
           </div>
-          {hasResponse ? (
-            <div className="relative">
-              <div className="max-h-[320px] overflow-y-auto mb-2 text-lg whitespace-pre-wrap rounded-2xl bg-white/40 dark:bg-black/30 p-6">
-                {lastModelResponse}
-              </div>
-              <button
-                onClick={handleBranch}
-                className="absolute -bottom-5 left-1/2 -translate-x-1/2 {buttonClass} bg-purple-500/70 hover:bg-purple-600/80 text-white shadow-lg"
-                title="Branch Chat"
+          
+          <div className="space-y-4">
+            {data.chatHistory.map((msg, idx) => (
+              <div 
+                key={idx} 
+                className={`p-4 rounded-xl ${
+                  msg.role === 'user' 
+                    ? 'bg-blue-900/20 border border-blue-800/30' 
+                    : 'bg-neutral-900/40 border border-neutral-700/30'
+                }`}
               >
-                <FiPlus size={22} />
-              </button>
-            </div>
-          ) : null}
-          {/* Resizer handle (bottom right) */}
-          <div
-            style={{ position: 'absolute', right: 8, bottom: 8, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 10 }}
-            title="Resize node"
-            onMouseDown={onResizeMouseDown}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18"><polyline points="4,18 18,18 18,4" fill="none" stroke="#888" strokeWidth="2" /></svg>
+                <div className="text-xs font-medium mb-1 text-gray-400">
+                  {msg.role === 'user' ? 'You' : 'Assistant'}
+                </div>
+                <div className="whitespace-pre-wrap text-white">{msg.content}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -184,50 +228,74 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
 
   return (
     <div
+      ref={nodeRef}
       className={nodeClass}
-      onClick={() => setActiveNodeId(id)}
+      onClick={handleNodeClick}
       tabIndex={0}
-      style={{ position: 'relative', width: size.width, height: size.height, minWidth: 320, minHeight: 120, maxWidth: 700, maxHeight: 600 }}
+      style={{ 
+        position: 'relative', 
+        width: size.width, 
+        height: size.height, 
+        minWidth: 350, 
+        minHeight: 140, 
+        maxWidth: 800, 
+        maxHeight: 600 
+      }}
     >
-      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-cyan-400" />
-      <div className="flex justify-between items-center mb-4">
-        <div className="font-medium text-base truncate flex-1">{data.label || 'New Chat'}</div>
+      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-neutral-400" />
+      <div className="flex justify-between items-center mb-3">
+        <div className="font-medium text-base truncate flex-1 text-white">{data.label || 'New Chat'}</div>
         <div className="flex gap-2">
           {hasResponse && (
-            <button onClick={toggleFullScreen} className={buttonClass} title="Full Screen">
-              <FiMaximize2 size={18} />
+            <>
+              <button 
+                onClick={handleBranch} 
+                className={iconButtonClass}
+                title="Branch Chat"
+              >
+                <FiPlus size={16} />
+              </button>
+              <button onClick={toggleFullScreen} className={iconButtonClass} title="Full Screen">
+                <FiMaximize2 size={16} />
+              </button>
+            </>
+          )}
+          <button onClick={handleReset} className={iconButtonClass} title="Reset Node">
+            <FiRefreshCw size={16} />
+          </button>
+          {!isRootNode && (
+            <button onClick={handleDelete} className="text-red-300 hover:text-red-200" title="Delete Node">
+              <FiTrash2 size={16} />
             </button>
           )}
-          <button onClick={handleReset} className={buttonClass} title="Reset Node">
-            <FiRefreshCw size={18} />
-          </button>
-          <button onClick={handleDelete} className={buttonClass + ' bg-red-500/70 hover:bg-red-600/80 text-white'} title="Delete Node">
-            <FiTrash2 size={18} />
-          </button>
         </div>
       </div>
       {hasResponse ? (
         <div className="relative">
-          <div className="max-h-[120px] overflow-y-auto mb-2 text-base whitespace-pre-wrap rounded-2xl bg-white/40 dark:bg-black/30 p-4">
+          <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white">
             {lastModelResponse}
           </div>
-          <button
-            onClick={handleBranch}
-            className="absolute -bottom-5 left-1/2 -translate-x-1/2 {buttonClass} bg-purple-500/70 hover:bg-purple-600/80 text-white shadow-lg"
-            title="Branch Chat"
-          >
-            <FiPlus size={18} />
-          </button>
         </div>
       ) : null}
-      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-cyan-400" />
+      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-neutral-400" />
       {/* Resizer handle (bottom right) */}
       <div
-        style={{ position: 'absolute', right: 8, bottom: 8, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 10 }}
+        style={{ 
+          position: 'absolute', 
+          right: 4, 
+          bottom: 4, 
+          width: 16, 
+          height: 16, 
+          cursor: 'nwse-resize', 
+          zIndex: 10,
+          opacity: 0.7
+        }}
         title="Resize node"
         onMouseDown={onResizeMouseDown}
       >
-        <svg width="18" height="18" viewBox="0 0 18 18"><polyline points="4,18 18,18 18,4" fill="none" stroke="#888" strokeWidth="2" /></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16">
+          <polyline points="4,16 16,16 16,4" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
       </div>
     </div>
   );

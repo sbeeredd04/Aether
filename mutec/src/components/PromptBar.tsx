@@ -12,6 +12,29 @@ export default function PromptBar({ node }: { node: any }) {
   // Reference to the textarea so we can adjust its height dynamically
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Adjust textarea height whenever `input` changes
+  useEffect(() => {
+    if (!textareaRef.current) return;
+    const ta = textareaRef.current;
+    ta.style.height = 'auto';
+    const scrollHeight = ta.scrollHeight;
+    // Two predefined heights: minHeight = 1.5rem (~24px), expandedHeight = 2x (48px)
+    const twoLineHeight = 48; // 2rem in pixels (approx)
+    if (scrollHeight <= twoLineHeight) {
+      ta.style.height = `${scrollHeight}px`;
+      ta.style.overflowY = 'hidden';
+    } else if (scrollHeight > twoLineHeight && scrollHeight <= 2 * twoLineHeight) {
+      // Up to 2x: let it expand
+      ta.style.height = `${scrollHeight}px`;
+      ta.style.overflowY = 'hidden';
+    } else {
+      // Beyond 2x: cap height and allow scroll
+      ta.style.height = `${2 * twoLineHeight}px`;
+      ta.style.overflowY = 'auto';
+    }
+  }, [input]);
+
+  // Return null early, but after hooks are declared
   if (!node) return null;
 
   const handleAskLLM = async () => {
@@ -55,37 +78,15 @@ export default function PromptBar({ node }: { node: any }) {
     }
   };
 
-  // Adjust textarea height whenever `input` changes
-  useEffect(() => {
-    if (!textareaRef.current) return;
-    const ta = textareaRef.current;
-    ta.style.height = 'auto';
-    const scrollHeight = ta.scrollHeight;
-    // Two predefined heights: minHeight = 1.5rem (~24px), expandedHeight = 2x (48px)
-    const twoLineHeight = 48; // 2rem in pixels (approx)
-    if (scrollHeight <= twoLineHeight) {
-      ta.style.height = `${scrollHeight}px`;
-      ta.style.overflowY = 'hidden';
-    } else if (scrollHeight > twoLineHeight && scrollHeight <= 2 * twoLineHeight) {
-      // Up to 2x: let it expand
-      ta.style.height = `${scrollHeight}px`;
-      ta.style.overflowY = 'hidden';
-    } else {
-      // Beyond 2x: cap height and allow scroll
-      ta.style.height = `${2 * twoLineHeight}px`;
-      ta.style.overflowY = 'auto';
-    }
-  }, [input]);
-
   return (
     <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center px-2 py-3 pointer-events-none">
       {/* Glass‐blur container with subtle border */}
       <div
         className="
           backdrop-blur-sm
-          bg-transparent
-          border border-white/20 dark:border-black/20
-          rounded-2xl
+          bg-black/20
+          border border-white/10
+          rounded-xl
           flex items-center
           w-full max-w-2xl
           px-3
@@ -101,7 +102,7 @@ export default function PromptBar({ node }: { node: any }) {
             className="
               bg-transparent
               text-base
-              text-current
+              text-white
               outline-none
               border-none
               pr-2
@@ -125,7 +126,8 @@ export default function PromptBar({ node }: { node: any }) {
               outline-none
               border-none
               text-sm
-              placeholder-gray-500 dark:placeholder-gray-400
+              text-white
+              placeholder-gray-400
               resize-none
               min-h-[24px]
               overflow-y-hidden
@@ -152,7 +154,7 @@ export default function PromptBar({ node }: { node: any }) {
             flex-shrink-0
             rounded-full
             bg-transparent
-            text-current
+            text-white
             p-2
             disabled:opacity-50 disabled:cursor-not-allowed
             flex items-center justify-center

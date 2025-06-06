@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+/* Custom CSS variables for light and dark themes */
 :root {
   --background: #f7fafd;
   --foreground: #171717;
@@ -25,7 +25,8 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 body::before {
@@ -50,6 +51,7 @@ body::before {
   box-shadow: 0 6px 32px rgba(0, 0, 0, 0.10);
 }
 
+/* Loading dots animation */
 .loading-dots {
   display: inline-flex;
   align-items: center;
@@ -78,6 +80,7 @@ body::before {
   }
 }
 
+/* Fullscreen modal */
 .modal-fullscreen {
   @apply fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8;
   background: rgba(0, 0, 0, 0.75);

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { memo, useState, useCallback } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import React, { memo, useState, useCallback, useRef } from 'react';
+import { Handle, Position, Node, Edge } from '@xyflow/react';
 import { useChatStore, CustomNodeData } from '../store/chatStore';
 import { FiSend, FiPlus, FiMaximize2, FiX, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 import logger from '@/utils/logger';
@@ -11,12 +11,63 @@ interface ChatMessage {
   content: string;
 }
 
+function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[] {
+  // Returns an array of node IDs from root to targetId
+  const path: string[] = [];
+  let currentId: string | undefined = targetId;
+  const incoming = new Map<string, string>();
+  edges.forEach(e => incoming.set(e.target, e.source));
+  while (currentId) {
+    path.unshift(currentId);
+    currentId = incoming.get(currentId);
+    if (!currentId || currentId === 'root') break;
+  }
+  if (currentId === 'root') path.unshift('root');
+  return path;
+}
+
 function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   const [input, setInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
   const { addMessageToNode, createNodeAndEdge, getPathToNode, resetNode, deleteNodeAndDescendants } = useChatStore();
+  const setActiveNodeId = useChatStore(s => s.setActiveNodeId);
+  const activeNodeId = useChatStore(s => s.activeNodeId);
+  const nodes = useChatStore(s => s.nodes);
+  const edges = useChatStore(s => s.edges);
+  const pathNodeIds = activeNodeId ? getPathNodeIds(nodes, edges, activeNodeId) : [];
+  const isActive = activeNodeId === id;
+  const isPath = pathNodeIds.includes(id);
+
+  // Resizing state
+  const [size, setSize] = useState({ width: 420, height: 180 });
+  const resizing = useRef(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const startSize = useRef({ width: 420, height: 180 });
+
+  const onResizeMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    e.stopPropagation();
+    resizing.current = true;
+    startPos.current = { x: e.clientX, y: e.clientY };
+    startSize.current = { ...size };
+    document.addEventListener('mousemove', onResizeMouseMove as EventListener);
+    document.addEventListener('mouseup', onResizeMouseUp as EventListener);
+  };
+  const onResizeMouseMove = (e: MouseEvent) => {
+    if (!resizing.current) return;
+    const dx = e.clientX - startPos.current.x;
+    const dy = e.clientY - startPos.current.y;
+    setSize({
+      width: Math.max(320, Math.min(700, startSize.current.width + dx)),
+      height: Math.max(120, Math.min(600, startSize.current.height + dy)),
+    });
+  };
+  const onResizeMouseUp = () => {
+    resizing.current = false;
+    document.removeEventListener('mousemove', onResizeMouseMove as EventListener);
+    document.removeEventListener('mouseup', onResizeMouseUp as EventListener);
+  };
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
   const lastModelResponse = data.chatHistory.find(msg => msg.role === 'model')?.content || '';
@@ -76,9 +127,11 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
 
   const toggleFullScreen = () => setIsFullScreen(!isFullScreen);
 
-  // Glassmorphism and border radius classes
+  // Responsive node class
   const nodeClass =
-    'glass-morphism bg-white/60 dark:bg-black/40 border border-white/30 dark:border-black/30 shadow-2xl rounded-3xl p-6 w-[380px] max-w-full transition-all backdrop-blur-xl';
+    `glass-morphism bg-white/60 dark:bg-black/40 border border-white/30 dark:border-black/30 shadow-2xl rounded-3xl p-6 transition-all backdrop-blur-xl ` +
+    (isActive ? 'ring-2 ring-blue-400 dark:ring-blue-600 ' : '') +
+    (isPath && !isActive ? 'border-2 border-gradient-to-r from-blue-400 via-blue-300 to-blue-500 dark:from-blue-600 dark:to-blue-400 ' : '');
   const buttonClass =
     'rounded-full p-2 bg-white/30 dark:bg-black/30 hover:bg-white/50 dark:hover:bg-black/50 transition-colors';
   const inputClass =
@@ -89,14 +142,40 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   if (isFullScreen) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/70">
-        <div className="glass-morphism bg-white/80 dark:bg-black/60 rounded-3xl shadow-2xl p-8 w-full max-w-2xl relative">
+        <div className={nodeClass + ' max-w-2xl w-full p-10'} style={{ position: 'relative' }}>
           <button onClick={toggleFullScreen} className="absolute top-4 right-4 {buttonClass}"><FiX size={28} /></button>
-          <div className="mb-6">
-            <h2 className="font-semibold text-2xl mb-2">{data.label}</h2>
-            {lastUserMessage && <p className="text-base opacity-60 mb-2">"{lastUserMessage}"</p>}
+          <div className="flex justify-between items-center mb-4">
+            <div className="font-medium text-2xl truncate flex-1">{data.label || 'New Chat'}</div>
+            <div className="flex gap-2">
+              <button onClick={handleReset} className={buttonClass} title="Reset Node">
+                <FiRefreshCw size={22} />
+              </button>
+              <button onClick={handleDelete} className={buttonClass + ' bg-red-500/70 hover:bg-red-600/80 text-white'} title="Delete Node">
+                <FiTrash2 size={22} />
+              </button>
+            </div>
           </div>
-          <div className="overflow-y-auto rounded-2xl bg-white/40 dark:bg-black/30 p-6 min-h-[120px] max-h-[400px] text-lg">
-            {lastModelResponse}
+          {hasResponse ? (
+            <div className="relative">
+              <div className="max-h-[320px] overflow-y-auto mb-2 text-lg whitespace-pre-wrap rounded-2xl bg-white/40 dark:bg-black/30 p-6">
+                {lastModelResponse}
+              </div>
+              <button
+                onClick={handleBranch}
+                className="absolute -bottom-5 left-1/2 -translate-x-1/2 {buttonClass} bg-purple-500/70 hover:bg-purple-600/80 text-white shadow-lg"
+                title="Branch Chat"
+              >
+                <FiPlus size={22} />
+              </button>
+            </div>
+          ) : null}
+          {/* Resizer handle (bottom right) */}
+          <div
+            style={{ position: 'absolute', right: 8, bottom: 8, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 10 }}
+            title="Resize node"
+            onMouseDown={onResizeMouseDown}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18"><polyline points="4,18 18,18 18,4" fill="none" stroke="#888" strokeWidth="2" /></svg>
           </div>
         </div>
       </div>
@@ -104,7 +183,12 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   }
 
   return (
-    <div className={nodeClass}>
+    <div
+      className={nodeClass}
+      onClick={() => setActiveNodeId(id)}
+      tabIndex={0}
+      style={{ position: 'relative', width: size.width, height: size.height, minWidth: 320, minHeight: 120, maxWidth: 700, maxHeight: 600 }}
+    >
       <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-cyan-400" />
       <div className="flex justify-between items-center mb-4">
         <div className="font-medium text-base truncate flex-1">{data.label || 'New Chat'}</div>
@@ -122,39 +206,7 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
           </button>
         </div>
       </div>
-      {!hasResponse ? (
-        <div className="flex gap-2 items-end">
-          <div className="flex-1 flex flex-col gap-2">
-            <textarea
-              value={input}
-              onChange={handleInputChange}
-              className={inputClass + ' resize-none min-h-[38px] max-h-[80px]'}
-              placeholder="Type your message..."
-              disabled={isLoading}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleAskLLM();
-                }
-              }}
-            />
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className={selectClass}
-            >
-              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-            </select>
-          </div>
-          <button
-            onClick={handleAskLLM}
-            disabled={isLoading || !input.trim()}
-            className={buttonClass + ' bg-blue-500/70 hover:bg-blue-600/80 text-white disabled:opacity-50 disabled:cursor-not-allowed'}
-          >
-            {isLoading ? <span className="animate-spin h-5 w-5 block border-2 border-t-transparent border-white rounded-full" /> : <FiSend size={20} />}
-          </button>
-        </div>
-      ) : (
+      {hasResponse ? (
         <div className="relative">
           <div className="max-h-[120px] overflow-y-auto mb-2 text-base whitespace-pre-wrap rounded-2xl bg-white/40 dark:bg-black/30 p-4">
             {lastModelResponse}
@@ -167,8 +219,16 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
             <FiPlus size={18} />
           </button>
         </div>
-      )}
+      ) : null}
       <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-cyan-400" />
+      {/* Resizer handle (bottom right) */}
+      <div
+        style={{ position: 'absolute', right: 8, bottom: 8, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 10 }}
+        title="Resize node"
+        onMouseDown={onResizeMouseDown}
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18"><polyline points="4,18 18,18 18,4" fill="none" stroke="#888" strokeWidth="2" /></svg>
+      </div>
     </div>
   );
 }

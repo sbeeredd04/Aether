@@ -31,6 +31,10 @@ interface ChatState {
   getPathToNode: (targetNodeId: string) => ChatMessage[];
   resetNode: (nodeId: string) => void;
   deleteNodeAndDescendants: (nodeId: string) => void;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
+  activeNodeId: string | null;
+  setActiveNodeId: (nodeId: string | null) => void;
 }
 
 const ROOT_NODE: Node<CustomNodeData> = {
@@ -235,4 +239,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       };
     });
   },
+
+  theme: (typeof window !== 'undefined' ? (localStorage.getItem('mutec-theme') as 'light' | 'dark') : 'light') || 'light',
+  setTheme: (theme) => {
+    set({ theme });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mutec-theme', theme);
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    }
+  },
+  activeNodeId: null,
+  setActiveNodeId: (nodeId) => set({ activeNodeId: nodeId }),
 })); 

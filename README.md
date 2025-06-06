@@ -35,15 +35,19 @@ Mutec allows users to create branching conversations from any point in a chat hi
 
 ### Immediate Tasks
 
-- [ ] Implement backend chat history persistence
-- [ ] Fix scrollbar styling and behavior
-- [ ] Improve node titles to better reflect conversation content
-- [ ] Update sidebar UI to display conversation context more clearly
-- [ ] Add model badges to nodes to show which AI model answered the question
-- [ ] Add support for multiple AI models
+- [✓] Implement backend chat history persistence
+- [✓] Fix scrollbar styling and behavior
+- [✓] Improve node titles to better reflect conversation content
+- [✓] Update sidebar UI to display conversation context more clearly
+- [✓] Add model badges to nodes to show which AI model answered the question
 - [ ] Implement markdown rendering for model outputs
-- [ ] Increase node size for better content display
-- [ ] Multiple models and their support
+- [ ] Multiple models and their support 
+    - [ ] Add multiple models and their support placeholders to the prompt bar
+    - [ ] document support / File upload
+    - [ ] grounding with google search
+    - [ ] add image generation and video generation and speech geneeration as well
+    - [ ] video and sccreen sharing understanding and support / Live API
+
 
 ### Future Enhancements
 
@@ -51,13 +55,6 @@ Mutec allows users to create branching conversations from any point in a chat hi
 - [ ] Shareable conversation graphs
 - [ ] Export conversations to different formats
 - [ ] Mobile-responsive design
-- [ ] Custom themes and visualization options
-- [ ] Collaborative features for team usage
-- [ ] Add thinking model
-- [ ] add image generation and video generation and speech geneeration as well
-- [ ] video and sccreen sharing understanding and support / Live API
-- [ ] document support / File upload
-- [ ] grounding with google search
 
 ## Project Structure
 

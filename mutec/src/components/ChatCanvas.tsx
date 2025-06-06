@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import ReactFlow, {
+import { 
+  ReactFlow,
   Controls,
   Background,
   MarkerType,

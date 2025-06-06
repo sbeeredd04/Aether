@@ -1,4 +1,5 @@
 import { generateContentStream } from '@/utils/gemini';
+import serverLogger from '@/utils/serverLogger';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -6,12 +7,15 @@ export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   try {
     const { history, prompt } = await req.json();
+    serverLogger.info('API call received', { prompt });
 
     if (!prompt || !history) {
+      serverLogger.warn('Missing prompt or history in request');
       return NextResponse.json({ error: 'Prompt and history are required' }, { status: 400 });
     }
 
     const stream = await generateContentStream(history, prompt);
+    serverLogger.debug('Stream generation started');
 
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
@@ -24,10 +28,11 @@ export async function POST(req: NextRequest) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\\n\\n`));
             }
           } catch (e) {
-             console.error('Error processing chunk:', e);
+             serverLogger.error('Error processing stream chunk', { error: e });
           }
         }
         controller.close();
+        serverLogger.debug('Stream closed');
       },
     });
 
@@ -39,7 +44,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('API Error:', error);
+    serverLogger.error('API Error', { error });
     // Check if the error is an object and has a message property
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json({ error: 'Failed to generate content', details: errorMessage }, { status: 500 });

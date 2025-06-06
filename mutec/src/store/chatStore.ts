@@ -30,6 +30,7 @@ interface ChatState {
   createNodeAndEdge: (sourceNodeId: string, label: string, type: 'response' | 'branch') => void;
   getPathToNode: (targetNodeId: string) => ChatMessage[];
   resetNode: (nodeId: string) => void;
+  deleteNodeAndDescendants: (nodeId: string) => void;
 }
 
 const ROOT_NODE: Node<CustomNodeData> = {
@@ -209,5 +210,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     
     return pathMessages;
+  },
+
+  deleteNodeAndDescendants: (nodeId) => {
+    set((state) => {
+      if (nodeId === 'root') return state; // Don't delete root
+      // Find all descendants
+      const nodesToRemove = new Set<string>([nodeId]);
+      const queue = [nodeId];
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        state.edges.forEach((edge) => {
+          if (edge.source === currentId) {
+            if (!nodesToRemove.has(edge.target)) {
+              nodesToRemove.add(edge.target);
+              queue.push(edge.target);
+            }
+          }
+        });
+      }
+      return {
+        nodes: state.nodes.filter((node) => !nodesToRemove.has(node.id)),
+        edges: state.edges.filter((edge) => !nodesToRemove.has(edge.source) && !nodesToRemove.has(edge.target)),
+      };
+    });
   },
 })); 

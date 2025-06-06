@@ -3,7 +3,7 @@
 import React, { memo, useState, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { useChatStore, CustomNodeData } from '../store/chatStore';
-import { FiSend, FiPlus, FiMaximize2, FiX, FiRefreshCw } from 'react-icons/fi';
+import { FiSend, FiPlus, FiMaximize2, FiX, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 import logger from '@/utils/logger';
 
 interface ChatMessage {
@@ -16,7 +16,7 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
-  const { addMessageToNode, createNodeAndEdge, getPathToNode, resetNode } = useChatStore();
+  const { addMessageToNode, createNodeAndEdge, getPathToNode, resetNode, deleteNodeAndDescendants } = useChatStore();
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
   const lastModelResponse = data.chatHistory.find(msg => msg.role === 'model')?.content || '';
@@ -70,6 +70,10 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
     resetNode(id);
   }, [id, resetNode]);
 
+  const handleDelete = useCallback(() => {
+    deleteNodeAndDescendants(id);
+  }, [id, deleteNodeAndDescendants]);
+
   const toggleFullScreen = () => setIsFullScreen(!isFullScreen);
 
   // Glassmorphism and border radius classes
@@ -113,18 +117,14 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
           <button onClick={handleReset} className={buttonClass} title="Reset Node">
             <FiRefreshCw size={18} />
           </button>
+          <button onClick={handleDelete} className={buttonClass + ' bg-red-500/70 hover:bg-red-600/80 text-white'} title="Delete Node">
+            <FiTrash2 size={18} />
+          </button>
         </div>
       </div>
       {!hasResponse ? (
-        <>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className={selectClass}
-          >
-            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-          </select>
-          <div className="flex gap-2 items-end">
+        <div className="flex gap-2 items-end">
+          <div className="flex-1 flex flex-col gap-2">
             <textarea
               value={input}
               onChange={handleInputChange}
@@ -138,15 +138,22 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData }) {
                 }
               }}
             />
-            <button
-              onClick={handleAskLLM}
-              disabled={isLoading || !input.trim()}
-              className={buttonClass + ' bg-blue-500/70 hover:bg-blue-600/80 text-white disabled:opacity-50 disabled:cursor-not-allowed'}
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className={selectClass}
             >
-              {isLoading ? <span className="animate-spin h-5 w-5 block border-2 border-t-transparent border-white rounded-full" /> : <FiSend size={20} />}
-            </button>
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            </select>
           </div>
-        </>
+          <button
+            onClick={handleAskLLM}
+            disabled={isLoading || !input.trim()}
+            className={buttonClass + ' bg-blue-500/70 hover:bg-blue-600/80 text-white disabled:opacity-50 disabled:cursor-not-allowed'}
+          >
+            {isLoading ? <span className="animate-spin h-5 w-5 block border-2 border-t-transparent border-white rounded-full" /> : <FiSend size={20} />}
+          </button>
+        </div>
       ) : (
         <div className="relative">
           <div className="max-h-[120px] overflow-y-auto mb-2 text-base whitespace-pre-wrap rounded-2xl bg-white/40 dark:bg-black/30 p-4">

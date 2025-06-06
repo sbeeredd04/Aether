@@ -1,23 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #f7fafd;
   --foreground: #171717;
-  --accent-1: rgba(147, 112, 219, 0.2);
-  --accent-2: rgba(0, 191, 255, 0.2);
-  --node-bg: rgba(255, 255, 255, 0.1);
-  --node-border: rgba(255, 255, 255, 0.1);
-  --glass-blur: 12px;
+  --accent-1: rgba(147, 112, 219, 0.18);
+  --accent-2: rgba(0, 191, 255, 0.13);
+  --node-bg: rgba(255, 255, 255, 0.65);
+  --node-border: rgba(200, 200, 255, 0.18);
+  --glass-blur: 18px;
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: dark), (html.dark) {
   :root {
-    --background: #000000;
-    --foreground: #ffffff;
-    --accent-1: rgba(147, 112, 219, 0.2);
-    --accent-2: rgba(0, 191, 255, 0.2);
-    --node-bg: rgba(255, 255, 255, 0.05);
-    --node-border: rgba(255, 255, 255, 0.1);
+    --background: #10131a;
+    --foreground: #f3f3f3;
+    --accent-1: rgba(147, 112, 219, 0.22);
+    --accent-2: rgba(0, 191, 255, 0.18);
+    --node-bg: rgba(18, 22, 34, 0.82);
+    --node-border: rgba(40, 40, 60, 0.32);
+    --glass-blur: 22px;
   }
 }
 
@@ -45,8 +46,8 @@ body::before {
   background: var(--node-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--node-border);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  border: 1.5px solid var(--node-border);
+  box-shadow: 0 6px 32px rgba(0, 0, 0, 0.10);
 }
 
 .loading-dots {

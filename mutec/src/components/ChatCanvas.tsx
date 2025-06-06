@@ -19,9 +19,7 @@ import SettingsPanel from './SettingsPanel';
 const nodeTypes = { chatNode: CustomChatNode };
 
 const flowStyle = {
-  background: 'linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(200,200,255,0.4) 100%)',
-  // fallback for dark mode
-  // will be overridden by dark mode class
+  background: 'var(--background)',
 };
 
 export default function ChatCanvas() {
@@ -38,7 +36,7 @@ export default function ChatCanvas() {
   );
 
   return (
-    <div className="w-screen h-screen bg-gradient-to-br from-white/80 via-blue-100/60 to-blue-200/40 dark:from-[#181c24] dark:via-[#23283a] dark:to-[#1a1d2b] transition-colors duration-300">
+    <div className="w-screen h-screen" style={{ background: 'var(--background)' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

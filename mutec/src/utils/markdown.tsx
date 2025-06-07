@@ -30,15 +30,18 @@ export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => 
             });
           };
 
-          const customSyntaxStyle: React.CSSProperties = {
-            ...atomDark['pre[class*="language-"]'],
-            backgroundColor: 'transparent',
-            background: 'transparent',
-            padding: '0',
-            margin: '0',
-            overflow: 'visible',
-            whiteSpace: 'pre-wrap',
-            wordWrap: 'break-word',
+          const customSyntaxStyle = {
+            ...atomDark,
+            'pre[class*="language-"]': {
+              ...atomDark['pre[class*="language-"]'],
+              backgroundColor: 'transparent',
+              background: 'transparent',
+              padding: '0',
+              margin: '0',
+              overflow: 'visible',
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+            },
           };
 
           return !inline && match ? (
@@ -106,16 +109,16 @@ export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => 
             </a>
           );
         },
-        ul({node, className, children, ...props}) {
+        ul({node, className, children, depth, ...props}: any) {
           return (
-            <ul className="list-disc pl-5 space-y-1 my-2" {...props}>
+            <ul className={`list-disc pl-5 space-y-1 ${depth > 0 ? 'mt-2' : 'my-2'}`} {...props}>
               {children}
             </ul>
           );
         },
-        ol({node, className, children, ...props}) {
+        ol({node, className, children, depth, ...props}: any) {
           return (
-            <ol className="list-decimal pl-5 space-y-1 my-2" {...props}>
+            <ol className={`list-decimal pl-5 space-y-1 ${depth > 0 ? 'mt-2' : 'my-2'}`} {...props}>
               {children}
             </ol>
           );

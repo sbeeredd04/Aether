@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiSend } from 'react-icons/fi';
 import { useChatStore } from '../store/chatStore';
+import { models } from '../utils/models';
 
 interface PromptBarProps {
   node: any;
@@ -10,7 +11,7 @@ interface PromptBarProps {
 
 export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarProps) {
   const [input, setInput] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
+  const [selectedModel, setSelectedModel] = useState(models[0].id);
   const addMessageToNode = useChatStore((s) => s.addMessageToNode);
   const getPathToNode = useChatStore((s) => s.getPathToNode);
 
@@ -64,7 +65,7 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history, prompt: input, apiKey }),
+        body: JSON.stringify({ history, prompt: input, apiKey, model: selectedModel }),
       });
       const data = await response.json();
       if (data.text) {
@@ -113,7 +114,9 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
               min-w-[120px]
             "
           >
-            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            {models.map(model => (
+              <option key={model.id} value={model.id}>{model.name}</option>
+            ))}
           </select>
         </div>
 

@@ -6,8 +6,8 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const { history, prompt, apiKey } = await req.json();
-    serverLogger.info('API call received', { prompt });
+    const { history, prompt, apiKey, model } = await req.json();
+    serverLogger.info('API call received', { prompt, model });
 
     if (!prompt || !history) {
       serverLogger.warn('Missing prompt or history in request');
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Gemini API key is required' }, { status: 400 });
     }
 
-    const text = await generateContent(apiKey, history, prompt);
+    const text = await generateContent(apiKey, history, prompt, model);
     serverLogger.debug('Model response received');
     return NextResponse.json({ text });
   } catch (error) {

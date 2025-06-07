@@ -46,52 +46,6 @@ export interface ModelDefinition {
       optimizedFor: 'Adaptive thinking, cost efficiency'
     },
     {
-      id: 'gemini-2.5-flash-thinking',
-      name: 'Gemini 2.5 Flash Thinking',
-      apiModel: 'gemini-2.5-flash-thinking',
-      isThinking: true, // Always thinking enabled
-      supportedInputs: ['text', 'audio', 'image', 'video'],
-      supportedOutputs: ['text'],
-      supportsGrounding: false,
-      supportsCitations: true,
-      capabilities: {
-        thinking: true
-      },
-      optimizedFor: 'Deep reasoning and complex problem solving'
-    },
-    {
-      id: 'gemini-2.5-flash-preview-native-audio-dialog',
-      name: 'Gemini 2.5 Flash Native Audio Dialog',
-      apiModel: 'gemini-2.5-flash-preview-native-audio-dialog',
-      isMultimedia: 'mixed',
-      supportedInputs: ['text', 'audio', 'video'],
-      supportedOutputs: ['text', 'audio'],
-      supportsGrounding: false,
-      supportsCitations: true,
-      capabilities: {
-        interleaved: true,
-        realtime: true
-      },
-      optimizedFor: 'High quality, natural conversational audio outputs'
-    },
-    {
-      id: 'gemini-2.5-flash-exp-native-audio-thinking-dialog',
-      name: 'Gemini 2.5 Flash Audio Thinking Dialog',
-      apiModel: 'gemini-2.5-flash-exp-native-audio-thinking-dialog',
-      isThinking: true,
-      isMultimedia: 'mixed',
-      supportedInputs: ['text', 'audio', 'video'],
-      supportedOutputs: ['text', 'audio'],
-      supportsGrounding: false,
-      supportsCitations: true,
-      capabilities: {
-        thinking: true,
-        interleaved: true,
-        realtime: true
-      },
-      optimizedFor: 'Natural conversational audio with thinking'
-    },
-    {
       id: 'gemini-2.5-flash-preview-tts',
       name: 'Gemini 2.5 Flash Preview TTS',
       apiModel: 'gemini-2.5-flash-preview-tts',
@@ -110,16 +64,14 @@ export interface ModelDefinition {
       id: 'gemini-2.0-flash',
       name: 'Gemini 2.0 Flash',
       apiModel: 'gemini-2.0-flash',
-      isThinking: true,
       supportedInputs: ['text', 'audio', 'image', 'video'],
       supportedOutputs: ['text'],
       supportsGrounding: true, // 2.0 models support search as tool
       supportsCitations: true,
       capabilities: {
-        thinking: true,
         realtime: true
       },
-      optimizedFor: 'Next generation features, speed, thinking, and realtime streaming'
+      optimizedFor: 'Next generation features, speed, and realtime streaming'
     },
     {
       id: 'gemini-2.0-flash-preview-image-generation',

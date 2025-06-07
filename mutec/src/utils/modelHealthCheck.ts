@@ -245,10 +245,8 @@ async function testModelCapabilities(model: ModelDefinition): Promise<HealthChec
     
     const groundingTest = await testModelWithTimeout(model.id, TEST_PROMPTS.grounding, {
       grounding: {
-        dynamicRetrievalConfig: {
-          mode: 'MODE_DYNAMIC',
-          dynamicThreshold: 0.7
-        }
+        enabled: true,
+        dynamicThreshold: 0.7
       }
     });
     
@@ -271,9 +269,9 @@ async function testModelCapabilities(model: ModelDefinition): Promise<HealthChec
       "Describe what you see in this test image.",
       {
         attachments: [{
-          type: 'image',
-          data: testImage,
-          mimeType: 'image/png'
+          name: 'test-image.png',
+          type: 'image/png',
+          data: testImage
         }]
       }
     );

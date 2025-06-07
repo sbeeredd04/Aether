@@ -107,15 +107,22 @@ export async function generateContent(
     });
 
     for (const att of attachments) {
+      // Strip data URL prefix if present (e.g., "data:image/png;base64,")
+      let cleanData = att.data;
+      if (att.data.includes(',')) {
+        cleanData = att.data.split(',')[1];
+      }
+
       serverLogger.debug("Gemini: Adding attachment to contents", { 
         requestId,
         fileName: att.name,
         mimeType: att.type,
-        dataLength: att.data.length
+        originalDataLength: att.data.length,
+        cleanDataLength: cleanData.length
       });
 
       contents.push({
-        inlineData: { mimeType: att.type, data: att.data },
+        inlineData: { mimeType: att.type, data: cleanData },
       });
     }
   } else {

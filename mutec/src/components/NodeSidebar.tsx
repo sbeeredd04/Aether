@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { FiRefreshCw, FiTrash2, FiPlus, FiX } from 'react-icons/fi';
 import { CustomNodeData, useChatStore, ChatMessage } from '../store/chatStore';
 import { SiGooglegemini } from 'react-icons/si';
+import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
 
 interface NodeSidebarProps {
   isOpen: boolean;
@@ -142,6 +143,8 @@ export default function NodeSidebar({
             threadMessages.map((msg, idx) => {
               const isUser = msg.role === 'user';
               const isModel = msg.role === 'model';
+              const contentHasMarkdown = isModel && hasMarkdown(msg.content);
+              
               return (
                 <div
                   key={idx}
@@ -152,6 +155,7 @@ export default function NodeSidebar({
                       ${isUser
                         ? 'bg-blue-700/90 text-white border border-blue-400/30 ml-auto'
                         : 'bg-neutral-900/90 text-white border border-neutral-700/40 mr-auto'}
+                      ${contentHasMarkdown ? 'markdown-message' : ''}
                     `}
                     style={{ minWidth: 60 }}
                   >
@@ -166,7 +170,15 @@ export default function NodeSidebar({
                     <div className="text-xs font-semibold mb-1 text-gray-300/80">
                       {isUser ? 'You' : getModelName()}
                     </div>
-                    <div>{msg.content}</div>
+                    
+                    {/* Conditionally render markdown or plain text */}
+                    {isModel && contentHasMarkdown ? (
+                      <div className="markdown-content">
+                        <MarkdownRenderer content={msg.content} />
+                      </div>
+                    ) : (
+                      <div>{msg.content}</div>
+                    )}
                   </div>
                 </div>
               );

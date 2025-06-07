@@ -144,3 +144,138 @@ body::before {
 .react-flow__node.selected {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
+
+/* Markdown styling */
+.markdown-content {
+  color: var(--foreground);
+  line-height: 1.6;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-content h1 {
+  font-size: 1.5em;
+  color: #d1d5db;
+}
+
+.markdown-content h2 {
+  font-size: 1.3em;
+  color: #d1d5db;
+}
+
+.markdown-content h3 {
+  font-size: 1.15em;
+  color: #d1d5db;
+}
+
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  font-size: 1em;
+  color: #d1d5db;
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol {
+  margin-bottom: 1em;
+}
+
+.markdown-content a {
+  color: #60a5fa;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.markdown-content a:hover {
+  text-decoration: none;
+  color: #93c5fd;
+}
+
+.markdown-content pre {
+  margin: 1em 0;
+  padding: 0.75em 1em;
+  border-radius: 0.5em;
+  background-color: rgba(17, 24, 39, 0.8);
+  overflow-x: auto;
+}
+
+.markdown-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9em;
+  border-radius: 0.25em;
+}
+
+.markdown-content :not(pre) > code {
+  padding: 0.2em 0.4em;
+  background-color: rgba(55, 65, 81, 0.5);
+  white-space: nowrap;
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid rgba(209, 213, 219, 0.4);
+  padding-left: 1em;
+  color: rgba(209, 213, 219, 0.8);
+  font-style: italic;
+  margin: 1em 0;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375em;
+  margin: 1em 0;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  overflow-x: auto;
+  display: block;
+}
+
+.markdown-content th {
+  background-color: rgba(31, 41, 55, 0.8);
+  color: #d1d5db;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5em 0.75em;
+  border: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.markdown-content td {
+  padding: 0.5em 0.75em;
+  border: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+.markdown-content tr:nth-child(even) {
+  background-color: rgba(31, 41, 55, 0.3);
+}
+
+.markdown-content hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+/* Adjustments for sidebar & nodes */
+.markdown-message .markdown-content {
+  font-size: 0.9rem;
+}
+
+.markdown-message .markdown-content pre {
+  max-height: 200px;
+  overflow-y: auto;
+}

@@ -6,6 +6,7 @@ import { useChatStore, CustomNodeData } from '../store/chatStore';
 import { FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 import { SiGooglegemini } from 'react-icons/si';
 import logger from '@/utils/logger';
+import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -69,6 +70,7 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
   const lastModelResponse = data.chatHistory.find(msg => msg.role === 'model')?.content || '';
   const lastUserMessage = data.chatHistory.find(msg => msg.role === 'user')?.content || '';
+  const responseHasMarkdown = hasResponse && hasMarkdown(lastModelResponse);
 
   const handleInputChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(evt.target.value);
@@ -209,7 +211,14 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
           <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent"
             style={{ scrollbarColor: 'rgba(255,255,255,0.7) transparent', scrollbarWidth: 'thin' }}
           >
-            {lastModelResponse}
+            {responseHasMarkdown ? (
+              <div className="markdown-content text-sm">
+                <MarkdownRenderer content={lastModelResponse} />
+              </div>
+            ) : (
+              <>{lastModelResponse}</>
+            )}
+            
             {/* Gemini logo at bottom right if Gemini model */}
             {isGeminiModel() && (
               <div className="absolute bottom-2 right-2 group" title={getModelName()}>

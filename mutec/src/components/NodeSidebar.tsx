@@ -5,6 +5,7 @@ import { FiRefreshCw, FiTrash2, FiPlus, FiX, FiFileText } from 'react-icons/fi';
 import { CustomNodeData, useChatStore, ChatMessage } from '../store/chatStore';
 import { SiGooglegemini } from 'react-icons/si';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
+import AudioPlayer from './AudioPlayer';
 import logger from '../utils/logger';
 
 interface NodeSidebarProps {
@@ -211,19 +212,12 @@ export default function NodeSidebar({
                                 onClick={() => window.open(att.previewUrl || `data:${att.type};base64,${att.data}`, '_blank')}
                               />
                             ) : att.type.startsWith('audio/') ? (
-                              <div className="flex flex-col items-center gap-2 p-2 w-full max-w-[250px]">
-                                <div className="flex items-center gap-2 text-white">
-                                  <FiFileText />
-                                  <span className="text-sm truncate">{att.name}</span>
-                                </div>
-                                <audio 
-                                  controls 
-                                  className="w-full max-w-[200px]"
-                                  src={att.previewUrl || `data:${att.type};base64,${att.data}`}
-                                >
-                                  Your browser does not support the audio element.
-                                </audio>
-                              </div>
+                              <AudioPlayer
+                                audioSrc={att.previewUrl || `data:${att.type};base64,${att.data}`}
+                                fileName={att.name}
+                                mimeType={att.type}
+                                className="w-full max-w-[250px]"
+                              />
                             ) : (
                               <div className="flex items-center gap-2 text-white p-2 w-full max-w-[200px]">
                                 <FiFileText />

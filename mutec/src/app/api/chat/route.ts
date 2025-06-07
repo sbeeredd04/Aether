@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     // Parse request body
     serverLogger.debug('API: Parsing request body', { requestId });
     const body = await req.json();
-    const { apiKey, modelId, history, prompt, attachments, ttsOptions } = body;
+    const { apiKey, modelId, history, prompt, attachments, ttsOptions, grounding, enableThinking } = body;
     
     serverLogger.info('API: Request parsed successfully', { 
       requestId,
@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
       historyLength: history?.length || 0,
       attachmentsCount: attachments?.length || 0,
       hasTtsOptions: !!ttsOptions,
-      attachmentTypes: attachments?.map((att: any) => ({ type: att.type, name: att.name, dataLength: att.data?.length })) || []
+      hasGrounding: !!grounding,
+      enableThinking,
+      attachmentTypes: attachments?.map((att: any) => ({ type: att.type, name: att.name, dataLength: att.data?.length || 0 })) || []
     });
 
     // Validate request
@@ -74,14 +76,27 @@ export async function POST(req: NextRequest) {
 
     // Call generateContent
     const startTime = Date.now();
-    const result = await generateContent(apiKey, history, prompt, modelId, attachments, ttsOptions);
+    const result = await generateContent(
+      apiKey,
+      history,
+      prompt,
+      modelId,
+      attachments,
+      ttsOptions,
+      grounding,
+      enableThinking
+    );
     const duration = Date.now() - startTime;
     
     serverLogger.info('API: generateContent completed', { 
       requestId,
       duration: `${duration}ms`,
-      resultType: Object.keys(result)[0],
-      resultKeys: Object.keys(result)
+      resultType: 'text' in result ? 'text' : 
+                  'audioBase64' in result ? 'audio' : 
+                  'images' in result ? 'images' : 'unknown',
+      resultSize: 'text' in result ? result.text.length :
+                  'audioBase64' in result ? result.audioBase64.length :
+                  'images' in result ? result.images.length : 0
     });
 
     // Analyze result
@@ -89,7 +104,7 @@ export async function POST(req: NextRequest) {
       serverLogger.debug('API: Processing text result', { 
         requestId,
         textLength: result.text.length,
-        textPreview: result.text.substring(0, 150) + (result.text.length > 150 ? '...' : '')
+        textPreview: result.text.substring(0, 100) + (result.text.length > 100 ? '...' : '')
       });
     } else if ('audioBase64' in result) {
       serverLogger.debug('API: Processing audio result', { 

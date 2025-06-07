@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiSend, FiPaperclip, FiX, FiPlus, FiMic } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSettings, FiSearch, FiVolume2 } from 'react-icons/fi';
 import { useChatStore } from '../store/chatStore';
-import { models } from '../utils/models';
+import { models, getTTSVoices } from '../utils/models';
 import logger from '../utils/logger';
 
 interface PromptBarProps {
@@ -15,24 +15,44 @@ interface Attachment {
   previewUrl: string;
 }
 
+interface TTSOptions {
+  voiceName?: string;
+  multiSpeaker?: Array<{ speaker: string; voiceName: string }>;
+}
+
+interface GroundingOptions {
+  enabled: boolean;
+  dynamicThreshold?: number;
+}
+
 export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarProps) {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedModel, setSelectedModel] = useState(models[0].id);
+  const [enableThinking, setEnableThinking] = useState(true);
+  const [ttsOptions, setTtsOptions] = useState<TTSOptions>({});
+  const [grounding, setGrounding] = useState<GroundingOptions>({ enabled: false, dynamicThreshold: 0.3 });
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  
   const addMessageToNode = useChatStore((s) => s.addMessageToNode);
   const getPathToNode = useChatStore((s) => s.getPathToNode);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     logger.debug('PromptBar: Component mounted/updated', { 
       nodeId: node?.id, 
       isLoading, 
       selectedModel,
-      attachmentsCount: attachments.length 
+      attachmentsCount: attachments.length,
+      enableThinking,
+      groundingEnabled: grounding.enabled,
+      hasTtsOptions: !!ttsOptions.voiceName || !!ttsOptions.multiSpeaker
     });
-  }, [node?.id, isLoading, selectedModel, attachments.length]);
+  }, [node?.id, isLoading, selectedModel, attachments.length, enableThinking, grounding.enabled, ttsOptions]);
 
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -51,29 +71,39 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
 
   const selectedModelDef = models.find(m => m.id === selectedModel);
   const isAudioOnlyModel = selectedModelDef?.isMultimedia === 'audio' && !selectedModelDef?.apiModel.includes('-live-');
+  const isTTSModel = selectedModelDef?.capabilities?.tts;
+  const supportsThinking = selectedModelDef?.isThinking;
+  const supportsGrounding = selectedModelDef?.supportsGrounding;
+  const supportsAudioInput = selectedModelDef?.supportedInputs.includes('audio');
   
-  logger.debug('PromptBar: Model selection analysis', {
+  logger.debug('PromptBar: Model capabilities analysis', {
     selectedModel,
     selectedModelDef: selectedModelDef ? {
       id: selectedModelDef.id,
       name: selectedModelDef.name,
       isMultimedia: selectedModelDef.isMultimedia,
-      apiModel: selectedModelDef.apiModel
+      apiModel: selectedModelDef.apiModel,
+      capabilities: selectedModelDef.capabilities
     } : null,
-    isAudioOnlyModel
+    isAudioOnlyModel,
+    isTTSModel,
+    supportsThinking,
+    supportsGrounding,
+    supportsAudioInput
   });
 
-  // Disable send button for audio models without voice options (for now)
+  // Disable send button for certain conditions
   const shouldDisableSend = isLoading || 
     (!input.trim() && attachments.length === 0) ||
-    (isAudioOnlyModel && true); // TODO: Add voice options check
+    (isAudioOnlyModel && !isTTSModel && true); // TODO: Add voice input check
 
   logger.debug('PromptBar: Send button state', {
     shouldDisableSend,
     isLoading,
     hasInput: !!input.trim(),
     hasAttachments: attachments.length > 0,
-    isAudioOnlyModel
+    isAudioOnlyModel,
+    isTTSModel
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,6 +144,22 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
     }
   };
 
+  const handleAudioInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    logger.info('PromptBar: Audio file selection initiated');
+    
+    if (event.target.files) {
+      const audioFiles = Array.from(event.target.files).filter(file => 
+        file.type.startsWith('audio/')
+      );
+      
+      if (audioFiles.length > 0) {
+        handleFileChange(event);
+      } else {
+        logger.warn('PromptBar: No audio files selected');
+      }
+    }
+  };
+
   const removeAttachment = (index: number) => {
     logger.info('PromptBar: Removing attachment', { index, fileName: attachments[index]?.file.name });
     setAttachments(prev => {
@@ -131,7 +177,10 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
       nodeId: node.id,
       prompt: input.substring(0, 100) + (input.length > 100 ? '...' : ''),
       selectedModel,
-      attachmentsCount: attachments.length 
+      attachmentsCount: attachments.length,
+      enableThinking,
+      groundingEnabled: grounding.enabled,
+      hasTtsOptions: !!ttsOptions.voiceName || !!ttsOptions.multiSpeaker
     });
 
     if (!input.trim() && attachments.length === 0) {
@@ -267,21 +316,39 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
         modelId: selectedModel,
         hasPrompt: !!input,
         attachmentsCount: attachmentData.length,
-        historyLength: history.length
+        historyLength: history.length,
+        enableThinking: supportsThinking ? enableThinking : undefined,
+        groundingEnabled: supportsGrounding ? grounding.enabled : undefined,
+        hasTtsOptions: isTTSModel && (!!ttsOptions.voiceName || !!ttsOptions.multiSpeaker)
       });
+
+      // Prepare request payload
+      const requestPayload: any = {
+        apiKey,
+        modelId: selectedModel,
+        history,
+        prompt: input,
+        attachments: attachmentData,
+      };
+
+      // Add model-specific options
+      if (supportsThinking) {
+        requestPayload.enableThinking = enableThinking;
+      }
+
+      if (supportsGrounding) {
+        requestPayload.grounding = grounding;
+      }
+
+      if (isTTSModel && (ttsOptions.voiceName || ttsOptions.multiSpeaker)) {
+        requestPayload.ttsOptions = ttsOptions;
+      }
 
       // Make API call
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey,
-          modelId: selectedModel,
-          history,
-          prompt: input,
-          attachments: attachmentData,
-          // TODO: Add ttsOptions when voice selection is implemented
-        }),
+        body: JSON.stringify(requestPayload),
       });
       
       logger.info('PromptBar: API response received', { 
@@ -387,6 +454,8 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
     }
   };
 
+  const ttsVoices = getTTSVoices();
+
   return (
     <div className="w-full flex justify-center items-end pointer-events-none">
       <div
@@ -395,6 +464,93 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
           rounded-2xl shadow-lg flex flex-col pointer-events-auto
         "
       >
+        {/* Advanced Options Panel */}
+        {showAdvancedOptions && (
+          <div className="p-3 border-b border-white/10 space-y-3">
+            {/* Thinking Toggle */}
+            {supportsThinking && (
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm text-white/80">
+                  <FiSettings size={16} />
+                  Thinking Mode
+                </label>
+                <button
+                  onClick={() => setEnableThinking(!enableThinking)}
+                  className={`w-10 h-6 rounded-full transition-colors ${
+                    enableThinking ? 'bg-purple-600' : 'bg-gray-600'
+                  }`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                    enableThinking ? 'translate-x-5' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+            )}
+
+            {/* Grounding Toggle */}
+            {supportsGrounding && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <FiSearch size={16} />
+                    Web Search
+                  </label>
+                  <button
+                    onClick={() => setGrounding(prev => ({ ...prev, enabled: !prev.enabled }))}
+                    className={`w-10 h-6 rounded-full transition-colors ${
+                      grounding.enabled ? 'bg-blue-600' : 'bg-gray-600'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                      grounding.enabled ? 'translate-x-5' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+                {grounding.enabled && selectedModelDef?.apiModel.includes('1.5') && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-white/60">Dynamic Threshold:</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={grounding.dynamicThreshold || 0.3}
+                      onChange={(e) => setGrounding(prev => ({ 
+                        ...prev, 
+                        dynamicThreshold: parseFloat(e.target.value) 
+                      }))}
+                      className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <span className="text-xs text-white/60 w-8">
+                      {grounding.dynamicThreshold || 0.3}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TTS Options */}
+            {isTTSModel && (
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm text-white/80">
+                  <FiVolume2 size={16} />
+                  Voice Options
+                </label>
+                <select
+                  value={ttsOptions.voiceName || ''}
+                  onChange={(e) => setTtsOptions(prev => ({ ...prev, voiceName: e.target.value || undefined }))}
+                  className="w-full bg-neutral-800 text-white text-sm rounded px-2 py-1 border border-white/10"
+                >
+                  <option value="">Default Voice</option>
+                  {ttsVoices.map(voice => (
+                    <option key={voice.id} value={voice.id}>{voice.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="p-3 flex-grow">
           {attachments.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2">
@@ -402,6 +558,11 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
                 <div key={index} className="relative group bg-neutral-700/60 rounded-lg p-1">
                    {att.file.type.startsWith('image/') ? (
                     <img src={att.previewUrl} alt={att.file.name} className="h-16 w-16 object-cover rounded-md" />
+                   ) : att.file.type.startsWith('audio/') ? (
+                    <div className="h-16 w-24 flex flex-col items-center justify-center text-white p-1 rounded-md">
+                      <FiVolume2 size={20} />
+                      <span className="text-xs truncate w-full text-center mt-1">{att.file.name}</span>
+                    </div>
                    ) : (
                     <div className="h-16 w-24 flex flex-col items-center justify-center text-white p-1 rounded-md">
                       <FiPaperclip size={20} />
@@ -450,6 +611,7 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
                 fileInputRef.current?.click();
               }} 
               className="text-white/70 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
+              title="Upload Files"
             >
               <FiPlus size={22} />
             </button>
@@ -461,6 +623,30 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
               onChange={handleFileChange}
               accept="image/png, image/jpeg, image/webp, image/heic, image/heif, application/pdf"
             />
+            
+            {supportsAudioInput && (
+              <>
+                <button 
+                  onClick={() => {
+                    logger.debug('PromptBar: Audio upload button clicked');
+                    audioInputRef.current?.click();
+                  }} 
+                  className="text-white/70 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
+                  title="Upload Audio"
+                >
+                  <FiVolume2 size={20} />
+                </button>
+                <input 
+                  type="file" 
+                  ref={audioInputRef} 
+                  multiple 
+                  hidden
+                  onChange={handleAudioInput}
+                  accept="audio/*"
+                />
+              </>
+            )}
+            
             <div className="flex-shrink-0">
               <select
                 value={selectedModel}
@@ -472,6 +658,10 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
                     modelDef: models.find(m => m.id === newModel)
                   });
                   setSelectedModel(newModel);
+                  // Reset options when model changes
+                  setEnableThinking(true);
+                  setGrounding({ enabled: false, dynamicThreshold: 0.3 });
+                  setTtsOptions({});
                 }}
                 className="bg-transparent text-sm text-white/80 outline-none border-none pr-2 h-8 rounded w-auto appearance-none cursor-pointer"
               >
@@ -482,9 +672,28 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="text-white/70 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10" disabled>
-                <FiMic size={20} />
+            {/* Advanced Options Toggle */}
+            <button 
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              className={`text-white/70 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10 ${
+                showAdvancedOptions ? 'bg-white/10 text-white' : ''
+              }`}
+              title="Advanced Options"
+                          >
+                <FiSettings size={20} />
+              </button>
+            
+            {/* Voice Recording Button */}
+            <button 
+              className={`transition-colors p-1.5 rounded-full hover:bg-white/10 ${
+                isRecording ? 'text-red-400' : 'text-white/70 hover:text-white'
+              }`} 
+              disabled={!supportsAudioInput}
+              title={supportsAudioInput ? "Voice Input" : "Voice input not supported for this model"}
+            >
+              <FiMic size={20} />
             </button>
+            
             <button
               onClick={handleAskLLM}
               disabled={shouldDisableSend}

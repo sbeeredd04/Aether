@@ -2,6 +2,7 @@ import {
   GoogleGenAI,
   Modality,
   Behavior,
+  Tool,
 } from "@google/genai";
 import serverLogger from "./serverLogger";
 import { getModelById, ModelDefinition } from "./models";
@@ -24,6 +25,18 @@ export type GenerateResult =
   | AudioResponse
   | ImageResponse;
 
+// TTS options interface
+export interface TTSOptions {
+  voiceName?: string;
+  multiSpeaker?: Array<{ speaker: string; voiceName: string }>;
+}
+
+// Search grounding options
+export interface GroundingOptions {
+  enabled: boolean;
+  dynamicThreshold?: number; // 0-1, for Gemini 1.5 models only
+}
+
 // The one unified entrypoint
 export async function generateContent(
   apiKey: string,
@@ -31,7 +44,9 @@ export async function generateContent(
   prompt: string,
   modelId = "gemini-2.0-flash",
   attachments?: AttachmentData[],
-  ttsOptions?: { voiceName: string; multiSpeaker?: Array<{ speaker: string; voiceName: string }> },
+  ttsOptions?: TTSOptions,
+  grounding?: GroundingOptions,
+  enableThinking?: boolean
 ): Promise<GenerateResult> {
 
   const requestId = Math.random().toString(36).substring(7);
@@ -44,7 +59,9 @@ export async function generateContent(
     promptLength: prompt?.length || 0,
     promptPreview: prompt ? prompt.substring(0, 100) + (prompt.length > 100 ? '...' : '') : null,
     attachmentsCount: attachments?.length || 0,
-    hasTtsOptions: !!ttsOptions
+    hasTtsOptions: !!ttsOptions,
+    hasGrounding: !!grounding?.enabled,
+    enableThinking
   });
 
   if (!apiKey) {
@@ -54,7 +71,11 @@ export async function generateContent(
 
   const modelDef = getModelById(modelId);
   if (!modelDef) {
-    serverLogger.error("Gemini: Model not found", { requestId, modelId, availableModels: ["gemini-2.0-flash", "gemini-2.0-flash-lite"] });
+    serverLogger.error("Gemini: Model not found", { 
+      requestId, 
+      modelId, 
+      availableModels: ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-flash-preview-05-20"]
+    });
     throw new Error(`Unsupported model: ${modelId}`);
   }
 
@@ -65,7 +86,11 @@ export async function generateContent(
       name: modelDef.name,
       apiModel: modelDef.apiModel,
       isThinking: modelDef.isThinking,
-      isMultimedia: modelDef.isMultimedia
+      isMultimedia: modelDef.isMultimedia,
+      supportedInputs: modelDef.supportedInputs,
+      supportedOutputs: modelDef.supportedOutputs,
+      supportsGrounding: modelDef.supportsGrounding,
+      capabilities: modelDef.capabilities
     }
   });
 
@@ -141,19 +166,62 @@ export async function generateContent(
   const startTime = Date.now();
 
   try {
+    // Prepare tools array for grounding
+    const tools: Tool[] = [];
+    if (grounding?.enabled && modelDef.supportsGrounding) {
+      serverLogger.info("Gemini: Adding grounding search tool", { requestId });
+      
+      if (modelDef.apiModel.includes('gemini-2.0')) {
+        // Gemini 2.0 uses Search as a tool
+        tools.push({
+          googleSearch: {}
+        } as any);
+        serverLogger.debug("Gemini: Added Google Search tool for 2.0 model", { requestId });
+      } else if (modelDef.apiModel.includes('gemini-1.5')) {
+        // Gemini 1.5 uses GoogleSearchRetrieval
+        const searchTool: any = {
+          googleSearchRetrieval: {}
+        };
+        
+        if (grounding.dynamicThreshold !== undefined) {
+          searchTool.googleSearchRetrieval.dynamicRetrievalConfig = {
+            mode: 'MODE_DYNAMIC',
+            dynamicThreshold: grounding.dynamicThreshold
+          };
+          serverLogger.debug("Gemini: Added dynamic retrieval config", { 
+            requestId, 
+            threshold: grounding.dynamicThreshold 
+          });
+        }
+        
+        tools.push(searchTool);
+        serverLogger.debug("Gemini: Added Google Search Retrieval tool for 1.5 model", { requestId });
+      }
+    }
+
     // --- THINKING MODELS ---
-    if (modelDef.isThinking) {
+    if (modelDef.isThinking && (enableThinking === undefined || enableThinking === true)) {
       serverLogger.info("Gemini: Processing thinking model", { 
         requestId,
         modelId,
-        apiModel: modelDef.apiModel
+        apiModel: modelDef.apiModel,
+        enableThinking
       });
+
+      const thinkingConfig: any = {
+        tools: tools.length > 0 ? tools : undefined,
+        responseModalities: ["TEXT"]
+      };
+
+      // Add thinking configuration
+      thinkingConfig.thinkingConfig = { includeThoughts: true };
+      serverLogger.debug("Gemini: Added thinking configuration", { requestId });
 
       const thinkingStartTime = Date.now();
       const result = await ai.models.generateContent({
         model: modelDef.apiModel,
         contents: fullHistory as any,
-        config: { thinkingConfig: { includeThoughts: true } },
+        config: thinkingConfig,
       });
       const thinkingDuration = Date.now() - thinkingStartTime;
 
@@ -214,7 +282,10 @@ export async function generateContent(
         hasTtsOptions: !!ttsOptions
       });
 
-      const config: any = { responseModalities: [Modality.AUDIO] };
+      const config: any = { 
+        responseModalities: [Modality.AUDIO],
+        tools: tools.length > 0 ? tools : undefined
+      };
       
       if (ttsOptions) {
         serverLogger.debug("Gemini: Applying TTS options", { 
@@ -258,7 +329,7 @@ export async function generateContent(
       const ttsStartTime = Date.now();
       const response = await ai.models.generateContent({
         model: modelDef.apiModel,
-        contents,
+        contents: [{ parts: contents }], // Use contents directly for TTS
         config,
       });
       const ttsDuration = Date.now() - ttsStartTime;
@@ -275,9 +346,10 @@ export async function generateContent(
           requestId,
           hasInline: !!inline,
           hasData: !!inline?.data,
-          mimeType: inline?.mimeType
+          mimeType: inline?.mimeType,
+          responseParts: response.candidates?.[0]?.content?.parts?.length || 0
         });
-        throw new Error("No audio returned");
+        throw new Error("No audio returned from TTS model");
       }
 
       serverLogger.info("Gemini: TTS audio data extracted", { 
@@ -297,10 +369,16 @@ export async function generateContent(
         apiModel: modelDef.apiModel
       });
 
+      const config: any = {
+        responseModalities: [Modality.IMAGE, Modality.TEXT], // Image models require both
+        tools: tools.length > 0 ? tools : undefined
+      };
+
       const imageStartTime = Date.now();
       const response = await ai.models.generateContent({
         model: modelDef.apiModel,
-        contents,
+        contents: fullHistory as any,
+        config,
       });
       const imageDuration = Date.now() - imageStartTime;
 
@@ -317,6 +395,7 @@ export async function generateContent(
         partTypes: parts.map((p: any, idx: number) => ({
           index: idx,
           hasInlineData: !!p.inlineData,
+          hasText: !!p.text,
           mimeType: p.inlineData?.mimeType,
           dataLength: p.inlineData?.data?.length || 0
         }))
@@ -359,12 +438,21 @@ export async function generateContent(
       chatHistoryLength: chatHistory.length,
       lastMessagePartsCount: lastMessage.parts.length,
       lastMessageHasText: lastMessage.parts.some(p => p.text),
-      lastMessageHasInlineData: lastMessage.parts.some(p => p.inlineData)
+      lastMessageHasInlineData: lastMessage.parts.some(p => p.inlineData),
+      hasTools: tools.length > 0,
+      toolsCount: tools.length
     });
+
+    const chatConfig: any = {};
+    if (tools.length > 0) {
+      chatConfig.tools = tools;
+      serverLogger.debug("Gemini: Added tools to chat config", { requestId, toolsCount: tools.length });
+    }
 
     const chat = ai.chats.create({
       model: modelDef.apiModel,
       history: chatHistory as any,
+      config: chatConfig,
     });
 
     const chatStartTime = Date.now();
@@ -374,15 +462,33 @@ export async function generateContent(
     serverLogger.info("Gemini: Chat model response received", { 
       requestId,
       duration: `${chatDuration}ms`,
-      hasCandidates: !!result.candidates?.length
+      hasCandidates: !!result.candidates?.length,
+      hasGroundingMetadata: !!result.candidates?.[0]?.groundingMetadata
     });
 
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    let text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    
+    // Add grounding information if available
+    const groundingMetadata = result.candidates?.[0]?.groundingMetadata;
+    if (groundingMetadata && grounding?.enabled) {
+      serverLogger.info("Gemini: Grounding metadata found", { 
+        requestId,
+        hasSearchEntryPoint: !!groundingMetadata.searchEntryPoint,
+        groundingChunksCount: groundingMetadata.groundingChunks?.length || 0,
+        groundingSupportsCount: groundingMetadata.groundingSupports?.length || 0
+      });
+      
+      // Add search suggestions if available
+      if (groundingMetadata.searchEntryPoint?.renderedContent) {
+        text += "\n\n---\n\n" + groundingMetadata.searchEntryPoint.renderedContent;
+      }
+    }
     
     serverLogger.info("Gemini: Chat response processing complete", { 
       requestId,
       responseLength: text.length,
-      responsePreview: text.substring(0, 150) + (text.length > 150 ? '...' : '')
+      responsePreview: text.substring(0, 150) + (text.length > 150 ? '...' : ''),
+      hasGrounding: !!groundingMetadata
     });
 
     return { text };

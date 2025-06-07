@@ -1,7 +1,5 @@
 // @/utils/serverLogger.ts
 import { config } from '@/config';
-import chalk from 'chalk';
-import boxen from 'boxen';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
 
@@ -20,42 +18,48 @@ const formatMessage = (level: string, message: string) => {
   return `[${timestamp}] [${level.toUpperCase()}] ${message}`;
 };
 
-const serverLog = (level: LogLevel, color: chalk.Chalk, message: string, context?: object) => {
+const serverLog = (level: LogLevel, message: string, context?: object) => {
   if (logLevels[level] < currentLogLevel) return;
 
   const formattedMessage = formatMessage(level, message);
-  console.log(color(formattedMessage));
+  
+  // Simple colored console output without chalk
+  const colors: Record<LogLevel, string> & { reset: string } = {
+    debug: '\x1b[34m',    // blue
+    info: '\x1b[32m',     // green
+    warn: '\x1b[33m',     // yellow
+    error: '\x1b[31m\x1b[1m', // red bold
+    silent: '\x1b[0m',    // no color for silent
+    reset: '\x1b[0m'      // reset
+  };
+  
+  if (level !== 'silent') {
+    console.log(`${colors[level]}${formattedMessage}${colors.reset}`);
+  }
 
   if (context) {
     const contextStr = JSON.stringify(context, null, 2);
     if (level === 'error' && config.isDev) {
-        const boxenOptions: boxen.Options = {
-            padding: 1,
-            margin: 1,
-            borderStyle: 'double',
-            borderColor: 'red',
-            title: 'Error Context',
-            titleAlignment: 'center',
-        };
-      console.log(boxen(contextStr, boxenOptions));
+      console.log(`${colors.error}ERROR CONTEXT:${colors.reset}`);
+      console.log(contextStr);
     } else {
-      console.log(chalk.gray(contextStr));
+      console.log(`\x1b[90m${contextStr}\x1b[0m`); // gray
     }
   }
 };
 
 const serverLogger = {
   debug: (message: string, context?: object) => {
-    serverLog('debug', chalk.blue, message, context);
+    serverLog('debug', message, context);
   },
   info: (message: string, context?: object) => {
-    serverLog('info', chalk.green, message, context);
+    serverLog('info', message, context);
   },
   warn: (message: string, context?: object) => {
-    serverLog('warn', chalk.yellow, message, context);
+    serverLog('warn', message, context);
   },
   error: (message: string, context?: object) => {
-    serverLog('error', chalk.red.bold, message, context);
+    serverLog('error', message, context);
   },
 };
 

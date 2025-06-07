@@ -5,6 +5,7 @@ import { FiRefreshCw, FiTrash2, FiPlus, FiX, FiFileText } from 'react-icons/fi';
 import { CustomNodeData, useChatStore, ChatMessage } from '../store/chatStore';
 import { SiGooglegemini } from 'react-icons/si';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
+import logger from '../utils/logger';
 
 interface NodeSidebarProps {
   isOpen: boolean;
@@ -37,17 +38,45 @@ export default function NodeSidebar({
   // Get all messages in the conversation thread from root to current node
   const threadMessages = nodeId ? getFullConversationThread(nodeId) : [];
   
+  logger.debug('NodeSidebar: Component render', { 
+    isOpen,
+    nodeId,
+    hasData: !!data,
+    threadMessagesCount: threadMessages.length,
+    isActiveNodeLoading,
+    width
+  });
+  
   function getFullConversationThread(targetNodeId: string): ChatMessage[] {
+    logger.debug('NodeSidebar: Getting conversation thread', { targetNodeId });
+    
     // First get all nodes in the path from root to target
     const pathNodeIds = getPathFromRootToNode(targetNodeId);
     
+    logger.debug('NodeSidebar: Path nodes identified', { 
+      targetNodeId,
+      pathLength: pathNodeIds.length,
+      pathNodeIds
+    });
+    
     // Then collect all messages from these nodes in order
     const allMessages: ChatMessage[] = [];
-    pathNodeIds.forEach(id => {
+    pathNodeIds.forEach((id, index) => {
       const node = nodes.find(n => n.id === id);
       if (node && node.data.chatHistory) {
         allMessages.push(...node.data.chatHistory);
+        logger.debug('NodeSidebar: Added messages from node', { 
+          nodeId: id,
+          nodeIndex: index,
+          messagesAdded: node.data.chatHistory.length,
+          totalMessages: allMessages.length
+        });
       }
+    });
+    
+    logger.debug('NodeSidebar: Conversation thread assembled', { 
+      targetNodeId,
+      totalMessages: allMessages.length
     });
     
     return allMessages;
@@ -175,7 +204,26 @@ export default function NodeSidebar({
                         {msg.attachments.map((att, attIdx) => (
                           <div key={attIdx} className="bg-black/20 p-1 rounded-md">
                             {att.type.startsWith('image/') ? (
-                              <img src={att.previewUrl} alt={att.name} className="max-w-[150px] max-h-[150px] rounded" />
+                              <img 
+                                src={att.previewUrl || `data:${att.type};base64,${att.data}`} 
+                                alt={att.name} 
+                                className="max-w-[150px] max-h-[150px] rounded cursor-pointer hover:scale-105 transition-transform" 
+                                onClick={() => window.open(att.previewUrl || `data:${att.type};base64,${att.data}`, '_blank')}
+                              />
+                            ) : att.type.startsWith('audio/') ? (
+                              <div className="flex flex-col items-center gap-2 p-2 w-full max-w-[250px]">
+                                <div className="flex items-center gap-2 text-white">
+                                  <FiFileText />
+                                  <span className="text-sm truncate">{att.name}</span>
+                                </div>
+                                <audio 
+                                  controls 
+                                  className="w-full max-w-[200px]"
+                                  src={att.previewUrl || `data:${att.type};base64,${att.data}`}
+                                >
+                                  Your browser does not support the audio element.
+                                </audio>
+                              </div>
                             ) : (
                               <div className="flex items-center gap-2 text-white p-2 w-full max-w-[200px]">
                                 <FiFileText />

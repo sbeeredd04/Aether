@@ -2,16 +2,11 @@
 
 import React, { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { Handle, Position, Node, Edge } from '@xyflow/react';
-import { useChatStore, CustomNodeData } from '../store/chatStore';
-import { FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import { useChatStore, CustomNodeData, ChatMessage } from '../store/chatStore';
+import { FiPlus, FiRefreshCw, FiTrash2, FiFileText } from 'react-icons/fi';
 import { SiGooglegemini } from 'react-icons/si';
 import logger from '@/utils/logger';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
-
-interface ChatMessage {
-  role: 'user' | 'model';
-  content: string;
-}
 
 function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[] {
   // Returns an array of node IDs from root to targetId
@@ -70,7 +65,9 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
   const lastModelResponse = data.chatHistory.find(msg => msg.role === 'model')?.content || '';
   const lastUserMessage = data.chatHistory.find(msg => msg.role === 'user')?.content || '';
+  const lastModelMessage = data.chatHistory.slice().reverse().find(msg => msg.role === 'model');
   const responseHasMarkdown = hasResponse && hasMarkdown(lastModelResponse);
+  const lastMessageHasAttachments = lastModelMessage?.attachments && lastModelMessage.attachments.length > 0;
 
   const handleInputChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(evt.target.value);
@@ -106,6 +103,13 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
   }, [id, deleteNodeAndDescendants]);
 
   const handleNodeClick = (e: React.MouseEvent) => {
+    logger.info('CustomChatNode: Node clicked', { 
+      nodeId: id,
+      isRootNode,
+      previousActiveNode: activeNodeId,
+      chatHistoryLength: data.chatHistory.length,
+      hasResponse
+    });
     setActiveNodeId(id);
   };
 
@@ -208,6 +212,32 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
       </div>
       {hasResponse ? (
         <div className="relative">
+          {lastMessageHasAttachments && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              {lastModelMessage?.attachments?.map((att, idx) => (
+                <div key={idx} className="relative">
+                  {att.type.startsWith('image/') ? (
+                    <img 
+                      src={att.previewUrl || `data:${att.type};base64,${att.data}`}
+                      alt={att.name}
+                      className="h-12 w-12 object-cover rounded cursor-pointer hover:scale-105 transition-transform"
+                      onClick={() => window.open(att.previewUrl || `data:${att.type};base64,${att.data}`, '_blank')}
+                    />
+                  ) : att.type.startsWith('audio/') ? (
+                    <div className="flex items-center gap-1 bg-neutral-800/50 rounded px-2 py-1">
+                      <FiFileText size={12} />
+                      <span className="text-xs text-white/80">{att.name}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 bg-neutral-800/50 rounded px-2 py-1">
+                      <FiFileText size={12} />
+                      <span className="text-xs text-white/80">{att.name}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent"
             style={{ scrollbarColor: 'rgba(255,255,255,0.7) transparent', scrollbarWidth: 'thin' }}
           >

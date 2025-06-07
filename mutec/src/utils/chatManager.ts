@@ -100,15 +100,26 @@ export class ChatManager {
   // Generate a title for a conversation node
   async generateTitle(messages: ChatMessage[]): Promise<string> {
     try {
-      const model = this.ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      
+      const modelName = 'gemini-1.5-flash';
+
+      const formattedHistory = messages.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }],
+      }));
+
       // Create a prompt that asks for a concise title
-      const prompt = `Given this conversation, generate a concise title (max 30 chars) that captures the main topic or question. Only return the title, no explanation:
+      const prompt = `Based on the following conversation, provide a concise title (maximum 5 words) that captures the main topic. Only return the title, without any additional text or quotation marks.
 
+Conversation:
 ${messages.map(msg => `${msg.role}: ${msg.content}`).join('\n')}`;
+      
+      const chat = this.ai.chats.create({
+        model: modelName,
+        history: formattedHistory,
+      });
 
-      const result = await model.generateContent(prompt);
-      const response = result?.response?.text() || '';
+      const result = await chat.sendMessage({ message: prompt });
+      const response = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
       // Clean up the response and ensure it's not too long
       const title = response.trim().replace(/^["']|["']$/g, '');

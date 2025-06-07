@@ -40,7 +40,11 @@ const controlsStyle = {
   }
 };
 
-const ChatCanvas: React.FC = () => {
+interface ChatCanvasProps {
+  disableInteractions?: boolean;
+}
+
+const ChatCanvas: React.FC<ChatCanvasProps> = ({ disableInteractions = false }) => {
   const { 
     nodes, 
     edges, 
@@ -98,17 +102,21 @@ const ChatCanvas: React.FC = () => {
             };
           })}
           edges={styledEdges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={handleConnect}
+          onNodesChange={disableInteractions ? undefined : onNodesChange}
+          onEdgesChange={disableInteractions ? undefined : onEdgesChange}
+          onConnect={disableInteractions ? undefined : handleConnect}
           nodeTypes={nodeTypes}
           fitView
           style={flowStyle}
           minZoom={0.2}
           maxZoom={1.5}
           defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
-          nodesDraggable
-          edgesFocusable={false}
+          nodesDraggable={!disableInteractions}
+          edgesFocusable={!disableInteractions}
+          panOnDrag={!disableInteractions}
+          zoomOnScroll={!disableInteractions}
+          zoomOnPinch={!disableInteractions}
+          panOnScroll={!disableInteractions}
         >
           <Background 
             variant={BackgroundVariant.Dots} 

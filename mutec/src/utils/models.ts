@@ -19,6 +19,7 @@ export interface ModelDefinition {
     supportsCitations?: boolean
     /** Special capabilities */
     capabilities?: {
+      thinking?: boolean
       tts?: boolean
       imageGeneration?: boolean
       realtime?: boolean
@@ -39,6 +40,9 @@ export interface ModelDefinition {
       supportedOutputs: ['text'],
       supportsGrounding: false, // 2.5 models don't support search as tool
       supportsCitations: true,
+      capabilities: {
+        thinking: true
+      },
       optimizedFor: 'Adaptive thinking, cost efficiency'
     },
     {
@@ -50,6 +54,9 @@ export interface ModelDefinition {
       supportedOutputs: ['text'],
       supportsGrounding: false,
       supportsCitations: true,
+      capabilities: {
+        thinking: true
+      },
       optimizedFor: 'Deep reasoning and complex problem solving'
     },
     {
@@ -78,6 +85,7 @@ export interface ModelDefinition {
       supportsGrounding: false,
       supportsCitations: true,
       capabilities: {
+        thinking: true,
         interleaved: true,
         realtime: true
       },
@@ -108,6 +116,7 @@ export interface ModelDefinition {
       supportsGrounding: true, // 2.0 models support search as tool
       supportsCitations: true,
       capabilities: {
+        thinking: true,
         realtime: true
       },
       optimizedFor: 'Next generation features, speed, thinking, and realtime streaming'
@@ -140,6 +149,8 @@ export interface ModelDefinition {
   
   export const getModelById = (id: string): ModelDefinition | undefined =>
     models.find(m => m.id === id)
+  
+  export const getAvailableModels = (): ModelDefinition[] => models
   
   export const getTTSVoices = () => [
     { id: 'Zephyr', name: 'Zephyr (Bright)' },

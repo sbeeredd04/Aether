@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { FiRefreshCw, FiTrash2, FiPlus, FiX, FiFileText } from 'react-icons/fi';
+import { FiRefreshCw, FiTrash2, FiPlus, FiX, FiFileText, FiChevronDown, FiChevronRight } from 'react-icons/fi';
 import { CustomNodeData, useChatStore, ChatMessage } from '../store/chatStore';
 import { SiGooglegemini } from 'react-icons/si';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
@@ -19,6 +19,7 @@ interface NodeSidebarProps {
   onBranch: () => void;
   width?: number;
   isActiveNodeLoading?: boolean;
+  onImageClick?: (imageSrc: string, imageTitle: string) => void;
 }
 
 export default function NodeSidebar({
@@ -31,10 +32,12 @@ export default function NodeSidebar({
   onDelete,
   onBranch,
   width = 384,
-  isActiveNodeLoading = false
+  isActiveNodeLoading = false,
+  onImageClick
 }: NodeSidebarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { getPathToNode, nodes, edges } = useChatStore();
+  const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set());
   
   // Get all messages in the conversation thread from root to current node
   const threadMessages = nodeId ? getFullConversationThread(nodeId) : [];
@@ -108,6 +111,40 @@ export default function NodeSidebar({
     }
   }, [threadMessages.length]);
 
+  // Parse thoughts from model response
+  const parseThoughts = (content: string) => {
+    const thoughtsIndex = content.indexOf('**Thoughts:**\n');
+    const answerIndex = content.indexOf('\n\n---\n\n**Answer:**\n');
+    
+    if (thoughtsIndex !== -1 && answerIndex !== -1 && answerIndex > thoughtsIndex) {
+      const thoughts = content.substring(thoughtsIndex + 14, answerIndex).trim();
+      const answer = content.substring(answerIndex + 17).trim();
+      return {
+        thoughts,
+        answer,
+        hasThoughts: true
+      };
+    }
+    return {
+      thoughts: '',
+      answer: content,
+      hasThoughts: false
+    };
+  };
+
+  // Toggle thought expansion
+  const toggleThoughts = (messageIndex: number) => {
+    setExpandedThoughts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(messageIndex)) {
+        newSet.delete(messageIndex);
+      } else {
+        newSet.add(messageIndex);
+      }
+      return newSet;
+    });
+  };
+
   if (!isOpen || !data) return null;
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
@@ -174,6 +211,8 @@ export default function NodeSidebar({
               const isUser = msg.role === 'user';
               const isModel = msg.role === 'model';
               const contentHasMarkdown = isModel && hasMarkdown(msg.content);
+              const parsedContent = isModel ? parseThoughts(msg.content) : null;
+              const isThoughtsExpanded = expandedThoughts.has(idx);
               
               return (
                 <div
@@ -209,7 +248,10 @@ export default function NodeSidebar({
                                 src={att.previewUrl || `data:${att.type};base64,${att.data}`} 
                                 alt={att.name} 
                                 className="max-w-[150px] max-h-[150px] rounded cursor-pointer hover:scale-105 transition-transform" 
-                                onClick={() => window.open(att.previewUrl || `data:${att.type};base64,${att.data}`, '_blank')}
+                                onClick={() => onImageClick && onImageClick(
+                                  att.previewUrl || `data:${att.type};base64,${att.data}`,
+                                  att.name
+                                )}
                               />
                             ) : att.type.startsWith('audio/') ? (
                               <AudioPlayer
@@ -229,12 +271,44 @@ export default function NodeSidebar({
                       </div>
                     )}
                     
-                    {isModel && contentHasMarkdown ? (
-                      <div className="markdown-content">
-                        <MarkdownRenderer content={msg.content} />
+                    {/* Thoughts dropdown for model messages */}
+                    {isModel && parsedContent?.hasThoughts && (
+                      <div className="mb-2">
+                        <button
+                          onClick={() => toggleThoughts(idx)}
+                          className="flex items-center gap-2 text-xs text-blue-300 hover:text-blue-200 transition-colors"
+                        >
+                          {isThoughtsExpanded ? <FiChevronDown size={14} /> : <FiChevronRight size={14} />}
+                          {isThoughtsExpanded ? 'Hide' : 'Show'} Thoughts
+                        </button>
+                        {isThoughtsExpanded && (
+                          <div className="mt-2 p-3 bg-black/20 rounded-lg border border-blue-500/20">
+                            <div className="text-xs font-semibold text-blue-300 mb-2">Thoughts:</div>
+                            <div className="text-sm text-white/80 whitespace-pre-wrap">{parsedContent.thoughts}</div>
+                          </div>
+                        )}
                       </div>
+                    )}
+                    
+                    {/* Message content */}
+                    {isModel && parsedContent?.hasThoughts ? (
+                      // Show only the answer part if thoughts are present
+                      parsedContent.answer && (contentHasMarkdown ? (
+                        <div className="markdown-content">
+                          <MarkdownRenderer content={parsedContent.answer} />
+                        </div>
+                      ) : (
+                        <div className="whitespace-pre-wrap">{parsedContent.answer}</div>
+                      ))
                     ) : (
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                      // Show full content for non-thinking responses
+                      isModel && contentHasMarkdown ? (
+                        <div className="markdown-content">
+                          <MarkdownRenderer content={msg.content} />
+                        </div>
+                      ) : (
+                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                      )
                     )}
                   </div>
                 </div>

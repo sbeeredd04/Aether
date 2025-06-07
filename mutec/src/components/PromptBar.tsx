@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSettings, FiSearch, FiVolume2 } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSettings, FiSearch, FiVolume2, FiUpload } from 'react-icons/fi';
 import { useChatStore } from '../store/chatStore';
 import { models, getTTSVoices } from '../utils/models';
 import logger from '../utils/logger';
@@ -8,6 +8,10 @@ interface PromptBarProps {
   node: any;
   isLoading: boolean;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  onShowVoiceModal?: () => void;
+  onShowImageModal?: (imageSrc: string, imageTitle: string) => void;
+  voiceTranscript?: string;
+  onClearVoiceTranscript?: () => void;
 }
 
 interface Attachment {
@@ -25,7 +29,21 @@ interface GroundingOptions {
   dynamicThreshold?: number;
 }
 
-export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarProps) {
+export default function PromptBar({ 
+  node, 
+  isLoading, 
+  setIsLoading, 
+  onShowVoiceModal, 
+  onShowImageModal,
+  voiceTranscript,
+  onClearVoiceTranscript 
+}: PromptBarProps) {
+  // Early return check BEFORE any hooks
+  if (!node) {
+    logger.warn('PromptBar: No active node provided');
+    return null;
+  }
+
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedModel, setSelectedModel] = useState(models[0].id);
@@ -34,6 +52,12 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
   const [grounding, setGrounding] = useState<GroundingOptions>({ enabled: false, dynamicThreshold: 0.3 });
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  
+  // New modal states
+  const [showModelInfo, setShowModelInfo] = useState(false);
+  
+  // Drag and drop state
+  const [isDragOver, setIsDragOver] = useState(false);
   
   const addMessageToNode = useChatStore((s) => s.addMessageToNode);
   const getPathToNode = useChatStore((s) => s.getPathToNode);
@@ -64,10 +88,14 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
     ta.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [input]);
 
-  if (!node) {
-    logger.warn('PromptBar: No active node provided');
-    return null;
-  }
+  // Handle voice transcript input
+  useEffect(() => {
+    if (voiceTranscript && voiceTranscript.trim()) {
+      logger.info('PromptBar: Voice transcript received', { transcriptLength: voiceTranscript.length });
+      setInput(prev => prev + (prev ? ' ' : '') + voiceTranscript);
+      onClearVoiceTranscript?.();
+    }
+  }, [voiceTranscript, onClearVoiceTranscript]);
 
   const selectedModelDef = models.find(m => m.id === selectedModel);
   const isAudioOnlyModel = selectedModelDef?.isMultimedia === 'audio' && !selectedModelDef?.apiModel.includes('-live-');
@@ -171,7 +199,35 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
       return updated;
     });
   };
-  
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      logger.info('PromptBar: Files dropped', { count: files.length });
+      
+      const newAttachments: Attachment[] = files.map(file => ({
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }));
+      
+      setAttachments(prev => [...prev, ...newAttachments]);
+    }
+  };
+
   const handleAskLLM = async () => {
     logger.info('PromptBar: Starting LLM request', { 
       nodeId: node.id,
@@ -459,11 +515,25 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
   return (
     <div className="w-full flex justify-center items-end pointer-events-none">
       <div
-        className="
+        className={`
           w-full max-w-3xl bg-neutral-900/80 backdrop-blur-md
-          rounded-2xl shadow-lg flex flex-col pointer-events-auto
-        "
+          rounded-2xl shadow-lg flex flex-col pointer-events-auto transition-colors
+          ${isDragOver ? 'ring-2 ring-purple-400/50 bg-purple-900/20' : ''}
+        `}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
+        {/* Drag overlay */}
+        {isDragOver && (
+          <div className="absolute inset-0 bg-purple-600/20 border-2 border-dashed border-purple-400 rounded-2xl 
+                          flex items-center justify-center z-10 pointer-events-none">
+            <div className="text-purple-300 text-center">
+              <FiUpload size={24} className="mx-auto mb-2" />
+              <p>Drop files here</p>
+            </div>
+          </div>
+        )}
         {/* Advanced Options Panel */}
         {showAdvancedOptions && (
           <div className="p-3 border-b border-white/10 space-y-3">
@@ -685,6 +755,7 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
             
             {/* Voice Recording Button */}
             <button 
+              onClick={() => onShowVoiceModal?.()}
               className={`transition-colors p-1.5 rounded-full hover:bg-white/10 ${
                 isRecording ? 'text-red-400' : 'text-white/70 hover:text-white'
               }`} 
@@ -712,6 +783,84 @@ export default function PromptBar({ node, isLoading, setIsLoading }: PromptBarPr
           </div>
         </div>
       </div>
+
+      {/* Model Info Modal */}
+      {showModelInfo && selectedModelDef && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+             onClick={() => setShowModelInfo(false)}>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div className="relative z-10 bg-neutral-900 rounded-xl border border-white/10 p-6 max-w-md w-full"
+               onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">{selectedModelDef.name}</h3>
+              <button
+                onClick={() => setShowModelInfo(false)}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-3 text-sm">
+              <div>
+                <span className="text-white/60">Model ID:</span>
+                <span className="text-white ml-2 font-mono">{selectedModelDef.id}</span>
+              </div>
+              
+              <div>
+                <span className="text-white/60">Supported Inputs:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedModelDef.supportedInputs.map(input => (
+                    <span key={input} className="px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded text-xs">
+                      {input}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <span className="text-white/60">Supported Outputs:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedModelDef.supportedOutputs.map(output => (
+                    <span key={output} className="px-2 py-0.5 bg-green-600/20 text-green-300 rounded text-xs">
+                      {output}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <span className="text-white/60">Capabilities:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedModelDef.capabilities && Object.entries(selectedModelDef.capabilities).map(([key, value]) => 
+                    value && (
+                      <span key={key} className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs">
+                        {key}
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+              
+              {selectedModelDef.supportsGrounding && (
+                <div>
+                  <span className="text-white/60">Features:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-300 rounded text-xs">
+                      Web Search
+                    </span>
+                    {selectedModelDef.supportsCitations && (
+                      <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-300 rounded text-xs">
+                        Citations
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

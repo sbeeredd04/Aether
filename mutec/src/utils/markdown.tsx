@@ -73,17 +73,22 @@ export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => 
         },
         table({node, className, children, ...props}) {
           return (
-            <div className="overflow-x-auto my-2">
-              <table className="min-w-full divide-y divide-gray-700 border border-gray-700 rounded" {...props}>
-                {children}
-              </table>
-            </div>
+            <table className="table-auto w-full my-2 border-collapse" {...props}>
+              {children}
+            </table>
+          );
+        },
+        thead({node, className, children, ...props}) {
+          return (
+            <thead className="bg-gray-800" {...props}>
+              {children}
+            </thead>
           );
         },
         th({node, className, children, ...props}) {
           return (
             <th 
-              className="bg-gray-800 px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+              className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-700"
               {...props}
             >
               {children}
@@ -92,7 +97,7 @@ export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => 
         },
         td({node, className, children, ...props}) {
           return (
-            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-300 border-t border-gray-700" {...props}>
+            <td className="px-4 py-2 text-sm text-gray-300 border-b border-gray-700" {...props}>
               {children}
             </td>
           );

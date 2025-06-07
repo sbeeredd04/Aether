@@ -5,7 +5,9 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
-import React from 'react';
+import React, { useState } from 'react';
+import { FiCopy, FiCheck } from 'react-icons/fi';
+import { CodeProps } from 'react-markdown/lib/ast-to-react';
 
 // Export the renderer component for direct use in React components
 export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
@@ -15,17 +17,51 @@ export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => 
       remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[rehypeKatex, rehypeRaw]}
       components={{
-        code({node, inline, className, children, ...props}) {
+        code({ node, inline, className, children, ...props }: CodeProps) {
+          const [isCopied, setIsCopied] = useState(false);
           const match = /language-(\w+)/.exec(className || '');
+          const codeString = String(children).replace(/\n$/, '');
+
+          const handleCopy = () => {
+            if (isCopied) return;
+            navigator.clipboard.writeText(codeString).then(() => {
+              setIsCopied(true);
+              setTimeout(() => setIsCopied(false), 2000);
+            });
+          };
+
+          const customSyntaxStyle: React.CSSProperties = {
+            ...atomDark['pre[class*="language-"]'],
+            backgroundColor: 'transparent',
+            background: 'transparent',
+            padding: '0',
+            margin: '0',
+            overflow: 'visible',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+          };
+
           return !inline && match ? (
-            <SyntaxHighlighter
-              style={atomDark}
-              language={match[1]}
-              PreTag="div"
-              {...props}
-            >
-              {String(children).replace(/\n$/, '')}
-            </SyntaxHighlighter>
+            <div className="code-block-wrapper">
+              <button
+                onClick={handleCopy}
+                className={`copy-button ${isCopied ? 'copied' : ''}`}
+                title="Copy code"
+              >
+                {isCopied ? <FiCheck size={14} /> : <FiCopy size={14} />}
+                {isCopied ? 'Copied!' : 'Copy'}
+              </button>
+              <SyntaxHighlighter
+                style={customSyntaxStyle as any}
+                language={match[1]}
+                PreTag="pre"
+                wrapLines={true}
+                wrapLongLines={true}
+                {...props}
+              >
+                {codeString}
+              </SyntaxHighlighter>
+            </div>
           ) : (
             <code className={className} {...props}>
               {children}

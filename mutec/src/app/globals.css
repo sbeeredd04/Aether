@@ -323,3 +323,90 @@ body::before {
 .markdown-message .markdown-content {
   font-size: 0.9rem;
 }
+
+/* Google Search Suggestions Styling - Required by Google's guidelines */
+.search-suggestions .container {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  font-family: 'Google Sans', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  padding: 8px 12px;
+  background-color: #1f1f1f;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.search-suggestions .chip {
+  display: inline-block;
+  border: solid 1px #3c4043;
+  border-radius: 16px;
+  min-width: 14px;
+  padding: 5px 16px;
+  text-align: center;
+  user-select: none;
+  margin: 0 8px;
+  background-color: #2c2c2c;
+  color: #fff;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.search-suggestions .chip:hover {
+  background-color: #353536;
+}
+
+.search-suggestions .chip:focus {
+  background-color: #353536;
+}
+
+.search-suggestions .chip:active {
+  background-color: #464849;
+  border-color: #53575b;
+}
+
+.search-suggestions .carousel {
+  overflow: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  margin-right: -12px;
+}
+
+.search-suggestions .headline {
+  display: flex;
+  margin-right: 4px;
+}
+
+.search-suggestions .headline-label {
+  color: #fff;
+}
+
+.search-suggestions .gradient-container {
+  position: relative;
+}
+
+.search-suggestions .gradient {
+  position: absolute;
+  transform: translate(3px, -9px);
+  height: 36px;
+  width: 9px;
+  background: linear-gradient(90deg, #1f1f1f 15%, rgba(31, 31, 31, 0) 100%);
+}
+
+/* Citation styling */
+.citation-item .line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Search suggestion chip styling */
+.search-suggestion-chip {
+  transition: all 0.2s ease;
+}
+
+.search-suggestion-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}

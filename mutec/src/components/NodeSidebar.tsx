@@ -6,6 +6,7 @@ import { CustomNodeData, useChatStore, ChatMessage } from '../store/chatStore';
 import { SiGooglegemini } from 'react-icons/si';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
 import AudioPlayer from './AudioPlayer';
+import Citations from './Citations';
 import logger from '../utils/logger';
 
 interface NodeSidebarProps {
@@ -317,6 +318,18 @@ export default function NodeSidebar({
                       ) : (
                         <div className="whitespace-pre-wrap">{msg.content}</div>
                       )
+                    )}
+
+                    {/* Citations and search suggestions for model responses */}
+                    {isModel && (msg as any).groundingMetadata && (
+                      <div className="mt-3 pt-3 border-t border-neutral-700/50">
+                        <Citations
+                          citations={(msg as any).groundingMetadata.citations}
+                          searchQueries={(msg as any).groundingMetadata.webSearchQueries}
+                          searchEntryPoint={(msg as any).groundingMetadata.searchEntryPoint?.renderedContent}
+                          className="text-sm"
+                        />
+                      </div>
                     )}
                   </div>
                 </div>

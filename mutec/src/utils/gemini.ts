@@ -23,7 +23,33 @@ export interface ImageResponse { images: Array<{ data: string; mimeType: string 
 export type GenerateResult =
   | TextResponse
   | AudioResponse
-  | ImageResponse;
+  | ImageResponse
+  | GroundedTextResponse;
+
+export interface GroundedTextResponse { 
+  text: string; 
+  groundingMetadata?: {
+    searchEntryPoint?: {
+      renderedContent: string;
+    };
+    groundingChunks?: Array<{
+      web?: {
+        uri: string;
+        title: string;
+      };
+    }>;
+    groundingSupports?: Array<{
+      segment: {
+        startIndex?: number;
+        endIndex?: number;
+        text: string;
+      };
+      groundingChunkIndices: number[];
+      confidenceScores: number[];
+    }>;
+    webSearchQueries?: string[];
+  };
+}
 
 // TTS options interface
 export interface TTSOptions {
@@ -268,7 +294,7 @@ export async function generateContent(
         }
       }
 
-      const responseText = (thoughts ? `**Thoughts:**\n${thoughts}\n\n---\n\n` : "") + `**Answer:**\n${answer}`;
+      const responseText = (thoughts ? `**Thoughts:**\n${thoughts}\n\n---\n\n**Answer:**\n${answer}` : answer);
       serverLogger.info("Gemini: Thinking model processing complete", { 
         requestId,
         thoughtsLength: thoughts.length,
@@ -482,20 +508,34 @@ export async function generateContent(
         requestId,
         hasSearchEntryPoint: !!groundingMetadata.searchEntryPoint,
         groundingChunksCount: groundingMetadata.groundingChunks?.length || 0,
-        groundingSupportsCount: groundingMetadata.groundingSupports?.length || 0
+        groundingSupportsCount: groundingMetadata.groundingSupports?.length || 0,
+        webSearchQueriesCount: groundingMetadata.webSearchQueries?.length || 0
       });
       
-      // Add search suggestions if available
-      if (groundingMetadata.searchEntryPoint?.renderedContent) {
-        text += "\n\n---\n\n" + groundingMetadata.searchEntryPoint.renderedContent;
-      }
+      serverLogger.info("Gemini: Chat response processing complete", { 
+        requestId,
+        responseLength: text.length,
+        responsePreview: text.substring(0, 150) + (text.length > 150 ? '...' : ''),
+        hasGrounding: true
+      });
+
+      // Return grounded response with metadata
+      return { 
+        text,
+        groundingMetadata: {
+          searchEntryPoint: groundingMetadata.searchEntryPoint,
+          groundingChunks: groundingMetadata.groundingChunks,
+          groundingSupports: groundingMetadata.groundingSupports,
+          webSearchQueries: groundingMetadata.webSearchQueries
+        }
+      } as GroundedTextResponse;
     }
     
     serverLogger.info("Gemini: Chat response processing complete", { 
       requestId,
       responseLength: text.length,
       responsePreview: text.substring(0, 150) + (text.length > 150 ? '...' : ''),
-      hasGrounding: !!groundingMetadata
+      hasGrounding: false
     });
 
     return { text };

@@ -28,6 +28,8 @@ export interface ModelDefinition {
     }
     /** Description of what the model is optimized for */
     optimizedFor?: string
+    /** Whether to use the grounding pipeline for this model */
+    useGroundingPipeline?: boolean
   }
   
   export const models: ModelDefinition[] = [
@@ -46,20 +48,35 @@ export interface ModelDefinition {
       optimizedFor: 'Adaptive thinking, cost efficiency'
     },
     {
-      id: 'gemini-2.5-flash-preview-tts',
-      name: 'Gemini 2.5 Flash Preview TTS',
-      apiModel: 'gemini-2.5-flash-preview-tts',
-      isMultimedia: 'audio',
-      supportedInputs: ['text'],
-      supportedOutputs: ['audio'],
-      supportsGrounding: false,
-      supportsCitations: false,
+      id: 'gemini-2.5-flash-web-thinking',
+      name: 'Gemini 2.5 Flash Web + Thinking',
+      apiModel: 'gemini-2.5-flash-preview-05-20',
+      isThinking: true,
+      supportedInputs: ['text', 'audio', 'image', 'video'],
+      supportedOutputs: ['text'],
+      supportsGrounding: true, // Pipeline adds grounding
+      supportsCitations: true,
+      useGroundingPipeline: true,
       capabilities: {
-        tts: true,
-        multiSpeaker: true
+        thinking: true
       },
-      optimizedFor: 'Low latency, controllable text-to-speech'
+      optimizedFor: 'Web-grounded responses with adaptive thinking'
     },
+    // {
+    //   id: 'gemini-2.5-flash-preview-tts',
+    //   name: 'Gemini 2.5 Flash Preview TTS',
+    //   apiModel: 'gemini-2.5-flash-preview-tts',
+    //   isMultimedia: 'audio',
+    //   supportedInputs: ['text'],
+    //   supportedOutputs: ['audio'],
+    //   supportsGrounding: false,
+    //   supportsCitations: false,
+    //   capabilities: {
+    //     tts: true,
+    //     multiSpeaker: true
+    //   },
+    //   optimizedFor: 'Low latency, controllable text-to-speech'
+    // },
     {
       id: 'gemini-2.0-flash',
       name: 'Gemini 2.0 Flash',

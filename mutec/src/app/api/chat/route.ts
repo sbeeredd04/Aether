@@ -1,4 +1,5 @@
-import { generateContent } from '@/utils/gemini';
+import { generateContent, GroundedTextResponse } from '@/utils/gemini';
+import { executeGroundingPipeline, extractCitationsFromGrounding } from '@/utils/groundingPipeline';
 import serverLogger from '@/utils/serverLogger';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
     // Parse request body
     serverLogger.debug('API: Parsing request body', { requestId });
     const body = await req.json();
-    const { apiKey, modelId, history, prompt, attachments, ttsOptions, grounding, enableThinking } = body;
+    const { apiKey, modelId, history, prompt, attachments, ttsOptions, grounding, enableThinking, useGroundingPipeline } = body;
     
     serverLogger.info('API: Request parsed successfully', { 
       requestId,
@@ -66,26 +67,58 @@ export async function POST(req: NextRequest) {
       })) || []
     });
 
-    serverLogger.info('API: Calling generateContent', { 
-      requestId,
-      modelId,
-      apiKeyLength: apiKey?.length || 0,
-      historyLength: history?.length || 0,
-      attachmentsCount: attachments?.length || 0
-    });
-
-    // Call generateContent
     const startTime = Date.now();
-    const result = await generateContent(
-      apiKey,
-      history,
-      prompt,
-      modelId,
-      attachments,
-      ttsOptions,
-      grounding,
-      enableThinking
-    );
+    let result: any;
+
+    // Check if grounding pipeline should be used
+    if (useGroundingPipeline && grounding?.enabled) {
+      serverLogger.info('API: Using grounding pipeline', { 
+        requestId,
+        modelId,
+        apiKeyLength: apiKey?.length || 0,
+        historyLength: history?.length || 0,
+        attachmentsCount: attachments?.length || 0,
+        enableThinking
+      });
+
+      const groundingResult = await executeGroundingPipeline(
+        apiKey,
+        history,
+        prompt,
+        attachments,
+        enableThinking
+      );
+
+      result = {
+        text: groundingResult.text,
+        groundingMetadata: {
+          searchEntryPoint: groundingResult.searchEntryPoint ? { renderedContent: groundingResult.searchEntryPoint } : undefined,
+          webSearchQueries: groundingResult.searchQueries,
+          citations: groundingResult.citations
+        }
+      };
+    } else {
+      serverLogger.info('API: Calling generateContent', { 
+        requestId,
+        modelId,
+        apiKeyLength: apiKey?.length || 0,
+        historyLength: history?.length || 0,
+        attachmentsCount: attachments?.length || 0
+      });
+
+      // Call generateContent
+      result = await generateContent(
+        apiKey,
+        history,
+        prompt,
+        modelId,
+        attachments,
+        ttsOptions,
+        grounding,
+        enableThinking
+      );
+    }
+    
     const duration = Date.now() - startTime;
     
     serverLogger.info('API: generateContent completed', { 
@@ -116,7 +149,7 @@ export async function POST(req: NextRequest) {
       serverLogger.debug('API: Processing images result', { 
         requestId,
         imageCount: result.images.length,
-        images: result.images.map((img, idx) => ({
+        images: result.images.map((img: any, idx: number) => ({
           index: idx,
           mimeType: img.mimeType,
           dataLength: img.data.length
@@ -127,11 +160,17 @@ export async function POST(req: NextRequest) {
     // Branch on response type and prepare response
     let response;
     if ('text' in result) {
-      response = { text: result.text };
+      // Check if this is a grounded response
+      const groundedResult = result as GroundedTextResponse;
+      response = { 
+        text: groundedResult.text,
+        ...(groundedResult.groundingMetadata && { groundingMetadata: groundedResult.groundingMetadata })
+      };
       serverLogger.info('API: Returning text response', { 
         requestId,
         responseType: 'text',
-        textLength: result.text.length
+        textLength: groundedResult.text.length,
+        hasGroundingMetadata: !!groundedResult.groundingMetadata
       });
     } else if ('audioBase64' in result) {
       response = { 
@@ -152,7 +191,7 @@ export async function POST(req: NextRequest) {
         requestId,
         responseType: 'images',
         imageCount: result.images.length,
-        totalDataSize: result.images.reduce((sum, img) => sum + img.data.length, 0)
+        totalDataSize: result.images.reduce((sum: number, img: any) => sum + img.data.length, 0)
       });
     } else {
       serverLogger.error('API: Unknown result type from generateContent', { 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSettings, FiSearch, FiVolume2, FiUpload } from 'react-icons/fi';
 import { useChatStore } from '../store/chatStore';
-import { models, getTTSVoices } from '../utils/models';
+import { models, getTTSVoices, getModelById } from '../utils/models';
 import logger from '../utils/logger';
 
 interface PromptBarProps {
@@ -400,6 +400,14 @@ export default function PromptBar({
         requestPayload.ttsOptions = ttsOptions;
       }
 
+      // Add grounding pipeline flag if model supports it
+      const currentModel = getModelById(selectedModel);
+      if (currentModel?.useGroundingPipeline) {
+        requestPayload.useGroundingPipeline = true;
+        // Ensure grounding is enabled for pipeline
+        requestPayload.grounding = { enabled: true, dynamicThreshold: 0.3 };
+      }
+
       // Make API call
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -434,10 +442,27 @@ export default function PromptBar({
       if (data.text) {
         logger.info('PromptBar: Processing text response', { 
           responseLength: data.text.length,
-          preview: data.text.substring(0, 100) + (data.text.length > 100 ? '...' : '')
+          preview: data.text.substring(0, 100) + (data.text.length > 100 ? '...' : ''),
+          hasGroundingMetadata: !!data.groundingMetadata
         });
         
-        const modelMessage = { role: 'model' as const, content: data.text };
+        const modelMessage: any = { 
+          role: 'model' as const, 
+          content: data.text 
+        };
+        
+        // Add grounding metadata if present
+        if (data.groundingMetadata) {
+          modelMessage.groundingMetadata = data.groundingMetadata;
+          logger.debug('PromptBar: Added grounding metadata to message', {
+            hasSearchQueries: !!data.groundingMetadata.webSearchQueries,
+            searchQueriesCount: data.groundingMetadata.webSearchQueries?.length || 0,
+            hasCitations: !!data.groundingMetadata.citations,
+            citationsCount: data.groundingMetadata.citations?.length || 0,
+            hasSearchEntryPoint: !!data.groundingMetadata.searchEntryPoint
+          });
+        }
+        
         addMessageToNode(node.id, modelMessage, false);
         logger.debug('PromptBar: Text response added to node');
         

@@ -60,8 +60,13 @@ export default function VoiceInputModal({ isOpen, onClose, onTranscriptComplete 
       };
       
       recognition.onerror = (event: any) => {
-        logger.error('VoiceInputModal: Speech recognition error', { error: event.error });
-        setError(`Speech recognition error: ${event.error}`);
+        const errorMessage = event.error || 'Unknown error';
+        logger.error('VoiceInputModal: Speech recognition error', { 
+          error: errorMessage,
+          type: event.type,
+          timestamp: Date.now()
+        });
+        setError(`Speech recognition error: ${errorMessage}`);
         setIsRecording(false);
       };
       

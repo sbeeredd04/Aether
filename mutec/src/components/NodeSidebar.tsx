@@ -284,7 +284,15 @@ export default function NodeSidebar({
                         {isThoughtsExpanded && (
                           <div className="mt-2 p-3 bg-black/20 rounded-lg border border-blue-500/20">
                             <div className="text-xs font-semibold text-blue-300 mb-2">Thoughts:</div>
-                            <div className="text-sm text-white/80 whitespace-pre-wrap">{parsedContent.thoughts}</div>
+                            <div className="text-sm text-white/80">
+                              {hasMarkdown(parsedContent.thoughts) ? (
+                                <div className="markdown-content">
+                                  <MarkdownRenderer content={parsedContent.thoughts} />
+                                </div>
+                              ) : (
+                                <div className="whitespace-pre-wrap">{parsedContent.thoughts}</div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>

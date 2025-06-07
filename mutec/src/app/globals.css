@@ -216,12 +216,23 @@ body::before {
 
 .markdown-content ul, .markdown-content ol {
   padding-left: 2em;
+  list-style: none; /* Remove default list styling */
+}
+.markdown-content ul {
+  list-style-type: disc; /* Re-add disc bullets only for ul */
+  list-style-position: inside;
+}
+.markdown-content ol {
+  list-style-type: decimal; /* Re-add numbers only for ol */
+  list-style-position: inside;
 }
 .markdown-content li {
   margin-bottom: 0.25em;
+  padding-left: 0;
 }
 .markdown-content li > p {
   margin-bottom: 0;
+  display: inline; /* Keep inline with bullet */
 }
 .markdown-content li::marker {
   color: #9ca3af;

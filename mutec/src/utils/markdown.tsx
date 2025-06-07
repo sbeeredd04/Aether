@@ -116,14 +116,14 @@ export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => 
         },
         ul({node, className, children, depth, ...props}: any) {
           return (
-            <ul className={`list-disc pl-5 space-y-1 ${depth > 0 ? 'mt-2' : 'my-2'}`} {...props}>
+            <ul className={`space-y-1 ${depth > 0 ? 'mt-2' : 'my-2'}`} {...props}>
               {children}
             </ul>
           );
         },
         ol({node, className, children, depth, ...props}: any) {
           return (
-            <ol className={`list-decimal pl-5 space-y-1 ${depth > 0 ? 'mt-2' : 'my-2'}`} {...props}>
+            <ol className={`space-y-1 ${depth > 0 ? 'mt-2' : 'my-2'}`} {...props}>
               {children}
             </ol>
           );

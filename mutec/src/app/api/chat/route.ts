@@ -6,12 +6,12 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const { history, prompt, apiKey, model } = await req.json();
-    serverLogger.info('API call received', { prompt, model });
+    const { history, prompt, apiKey, model, attachments } = await req.json();
+    serverLogger.info('API call received', { prompt, model, hasAttachments: attachments && attachments.length > 0 });
 
-    if (!prompt || !history) {
-      serverLogger.warn('Missing prompt or history in request');
-      return NextResponse.json({ error: 'Prompt and history are required' }, { status: 400 });
+    if (!prompt && (!attachments || attachments.length === 0)) {
+      serverLogger.warn('Missing prompt or attachments in request');
+      return NextResponse.json({ error: 'Prompt or attachments are required' }, { status: 400 });
     }
     
     if (!apiKey) {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Gemini API key is required' }, { status: 400 });
     }
 
-    const text = await generateContent(apiKey, history, prompt, model);
+    const text = await generateContent(apiKey, history, prompt, model, attachments);
     serverLogger.debug('Model response received');
     return NextResponse.json({ text });
   } catch (error) {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { FiRefreshCw, FiTrash2, FiPlus, FiX } from 'react-icons/fi';
+import { FiRefreshCw, FiTrash2, FiPlus, FiX, FiFileText } from 'react-icons/fi';
 import { CustomNodeData, useChatStore, ChatMessage } from '../store/chatStore';
 import { SiGooglegemini } from 'react-icons/si';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
@@ -151,7 +151,7 @@ export default function NodeSidebar({
                   className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}
                 >
                   <div
-                    className={`relative max-w-[80%] px-4 py-3 rounded-2xl shadow-md whitespace-pre-wrap text-base font-normal transition-all
+                    className={`relative max-w-[80%] px-4 py-3 rounded-2xl shadow-md text-base font-normal transition-all
                       ${isUser
                         ? 'bg-blue-700/90 text-white border border-blue-400/30 ml-auto'
                         : 'bg-neutral-900/90 text-white border border-neutral-700/40 mr-auto'}
@@ -159,7 +159,6 @@ export default function NodeSidebar({
                     `}
                     style={{ minWidth: 60 }}
                   >
-                    {/* Gemini logo for model reply */}
                     {isModel && isGeminiModel() && (
                       <div className="absolute -top-5 -left-5 flex items-center" title={getModelName()}>
                         <span className="group-hover:scale-110 transition-transform cursor-pointer">
@@ -170,14 +169,30 @@ export default function NodeSidebar({
                     <div className="text-xs font-semibold mb-1 text-gray-300/80">
                       {isUser ? 'You' : getModelName()}
                     </div>
+
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        {msg.attachments.map((att, attIdx) => (
+                          <div key={attIdx} className="bg-black/20 p-1 rounded-md">
+                            {att.type.startsWith('image/') ? (
+                              <img src={att.previewUrl} alt={att.name} className="max-w-[150px] max-h-[150px] rounded" />
+                            ) : (
+                              <div className="flex items-center gap-2 text-white p-2 w-full max-w-[200px]">
+                                <FiFileText />
+                                <span className="text-sm truncate">{att.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     
-                    {/* Conditionally render markdown or plain text */}
                     {isModel && contentHasMarkdown ? (
                       <div className="markdown-content">
                         <MarkdownRenderer content={msg.content} />
                       </div>
                     ) : (
-                      <div>{msg.content}</div>
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
                     )}
                   </div>
                 </div>

@@ -13,9 +13,17 @@ import { nanoid } from 'nanoid';
 import { ChatManager } from '../utils/chatManager';
 import logger from '../utils/logger';
 
+export interface AttachmentData {
+  name: string;
+  type: string;
+  data: string; // base64
+  previewUrl: string; // object URL for client-side display
+}
+
 export interface ChatMessage {
   role: 'user' | 'model';
   content: string;
+  attachments?: AttachmentData[];
 }
 
 export type CustomNodeData = {
@@ -182,7 +190,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             isPartial && isSameRole
               ? node.data.chatHistory.map((msg: ChatMessage, idx: number) =>
                   idx === node.data.chatHistory.length - 1
-                    ? { ...msg, content: message.content }
+                    ? { ...msg, content: message.content } // Keep attachments from original message
                     : msg
                 )
               : [...node.data.chatHistory, message];

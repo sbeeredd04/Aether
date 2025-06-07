@@ -182,26 +182,27 @@ body::before {
 /* This is the wrapper for <pre> and copy button */
 .code-block-wrapper {
   position: relative;
-  margin: 1rem 0;
+  margin: 1.5em 0;
+  background-color: #000;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  overflow-x: auto;
 }
 
 .markdown-content pre {
-  background-color: #000 !important;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-  white-space: pre;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  overflow: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9rem;
 }
 
-.markdown-content pre code {
+.markdown-content code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  background: none !important;
-  color: inherit;
-  padding: 0;
-  white-space: inherit;
-  border-radius: 0;
+  font-size: 0.9em;
+  border-radius: 0.25em;
 }
 
 .markdown-content :not(pre) > code {
@@ -262,7 +263,7 @@ body::before {
 .markdown-content th {
   font-weight: 600;
 }
-.markdown-content tr:nth-child(2n) {
+.markdown-content tr:nth-child(even) {
   background-color: #1f2937;
 }
 
@@ -310,9 +311,4 @@ body::before {
 /* Adjustments for sidebar & nodes */
 .markdown-message .markdown-content {
   font-size: 0.9rem;
-}
-
-.markdown-message .markdown-content pre {
-  max-height: 200px;
-  overflow-y: auto;
 }

@@ -7,7 +7,6 @@ import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import React, { useState } from 'react';
 import { FiCopy, FiCheck } from 'react-icons/fi';
-import { CodeProps } from 'react-markdown/lib/ast-to-react';
 
 // Export the renderer component for direct use in React components
 export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
@@ -17,7 +16,8 @@ export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => 
       remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[rehypeKatex, rehypeRaw]}
       components={{
-        code({ node, inline, className, children, ...props }: CodeProps) {
+        pre: ({ children }) => <>{children}</>,
+        code({ node, inline, className, children, ...props }: any) {
           const [isCopied, setIsCopied] = useState(false);
           const match = /language-(\w+)/.exec(className || '');
           const codeString = String(children).replace(/\n$/, '');

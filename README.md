@@ -49,7 +49,9 @@ Mutec allows users to create branching conversations from any point in a chat hi
     - [✓] grounding with google search
     - [✓] add image generation
     - [ ] video and sccreen sharing understanding and support / Live API (Websocket)
-
+- [ ] Add color consistency in the UI and better UX
+- [ ] New Branch Redirection
+- [ ] Auto canvas restructuring
 
 ### Future Enhancements
 

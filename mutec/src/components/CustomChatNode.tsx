@@ -86,7 +86,8 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
     } catch (error: any) {
       addMessageToNode(id, { 
         role: 'model', 
-        content: `Error: ${error.message || error}` 
+        content: `Error: ${error.message || error}`,
+        modelId: 'error' // Mark error messages
       });
     }
   }, [id, input, addMessageToNode, sendMessageToNode]);

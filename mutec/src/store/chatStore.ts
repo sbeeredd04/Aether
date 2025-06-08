@@ -24,6 +24,7 @@ export interface ChatMessage {
   role: 'user' | 'model';
   content: string;
   attachments?: AttachmentData[];
+  modelId?: string; // Track which model generated this response
 }
 
 export type CustomNodeData = {
@@ -349,7 +350,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         responsePreview: response.substring(0, 100) + (response.length > 100 ? '...' : '')
       });
 
-      state.addMessageToNode(nodeId, { role: 'model', content: response });
+      state.addMessageToNode(nodeId, { role: 'model', content: response, modelId: 'chatManager' });
       logger.debug('ChatStore: Model response added to node', { nodeId });
       
       // Save to session after successful message
@@ -361,7 +362,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
       state.addMessageToNode(nodeId, { 
         role: 'model', 
-        content: `Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}` 
+        content: `Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`,
+        modelId: 'error'
       });
     }
   },

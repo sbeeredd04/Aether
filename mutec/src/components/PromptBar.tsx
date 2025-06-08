@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSettings, FiSearch, FiVolume2, FiUpload } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSearch, FiVolume2, FiUpload } from 'react-icons/fi';
+import { IoOptionsOutline } from "react-icons/io5";
+import { LuBrain } from "react-icons/lu";
+import { TbBrandGoogle } from "react-icons/tb";
 import { useChatStore } from '../store/chatStore';
 import { models, getTTSVoices, getModelById } from '../utils/models';
 import logger from '../utils/logger';
@@ -50,7 +53,7 @@ export default function PromptBar({
   const [enableThinking, setEnableThinking] = useState(true);
   const [ttsOptions, setTtsOptions] = useState<TTSOptions>({});
   const [grounding, setGrounding] = useState<GroundingOptions>({ enabled: false, dynamicThreshold: 0.3 });
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   
   // New modal states
@@ -448,7 +451,8 @@ export default function PromptBar({
         
         const modelMessage: any = { 
           role: 'model' as const, 
-          content: data.text 
+          content: data.text,
+          modelId: selectedModel
         };
         
         // Add grounding metadata if present
@@ -475,6 +479,7 @@ export default function PromptBar({
         const modelMessage = { 
           role: 'model' as const, 
           content: '[Audio Response]',
+          modelId: selectedModel,
           attachments: [{
             name: 'audio_response.wav',
             type: data.audio.mimeType || 'audio/wav',
@@ -505,6 +510,7 @@ export default function PromptBar({
         const modelMessage = { 
           role: 'model' as const, 
           content: '[Generated Images]',
+          modelId: selectedModel,
           attachments: imageAttachments
         };
         addMessageToNode(node.id, modelMessage, false);
@@ -512,11 +518,11 @@ export default function PromptBar({
         
       } else if (data.error) {
         logger.error('PromptBar: API returned error', { error: data.error });
-        addMessageToNode(node.id, { role: 'model', content: `Error: ${data.error}` });
+        addMessageToNode(node.id, { role: 'model', content: `Error: ${data.error}`, modelId: selectedModel });
         
       } else {
         logger.warn('PromptBar: Unknown response format', { responseKeys: Object.keys(data) });
-        addMessageToNode(node.id, { role: 'model', content: 'Error: Unknown response format from server' });
+        addMessageToNode(node.id, { role: 'model', content: 'Error: Unknown response format from server', modelId: selectedModel });
       }
 
       logger.info('PromptBar: Request completed successfully');
@@ -528,7 +534,7 @@ export default function PromptBar({
         nodeId: node.id,
         selectedModel
       });
-      addMessageToNode(node.id, { role: 'model', content: `Error: ${error.message}` });
+      addMessageToNode(node.id, { role: 'model', content: `Error: ${error.message}`, modelId: selectedModel });
     } finally {
       setIsLoading(false);
       logger.debug('PromptBar: Loading state set to false');
@@ -561,66 +567,64 @@ export default function PromptBar({
         )}
         {/* Advanced Options Panel */}
         {showAdvancedOptions && (
-          <div className="p-3 border-b border-white/10 space-y-3">
-            {/* Thinking Toggle */}
-            {supportsThinking && (
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm text-white/80">
-                  <FiSettings size={16} />
-                  Thinking Mode
-                </label>
+          <div className="p-3 border-b border-white/10">
+            <div className="flex flex-wrap gap-2">
+              {/* Thinking Tag */}
+              {supportsThinking && (
                 <button
                   onClick={() => setEnableThinking(!enableThinking)}
-                  className={`w-10 h-6 rounded-full transition-colors ${
-                    enableThinking ? 'bg-purple-600' : 'bg-gray-600'
-                  }`}
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all
+                    ${enableThinking 
+                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/50 shadow-md' 
+                      : 'bg-neutral-800/60 text-white/60 border border-white/10 hover:bg-neutral-700/60'
+                    }
+                  `}
                 >
-                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                    enableThinking ? 'translate-x-5' : 'translate-x-1'
-                  }`} />
+                  <LuBrain size={16} />
+                  Thinking
                 </button>
-              </div>
-            )}
+              )}
 
-            {/* Grounding Toggle */}
-            {supportsGrounding && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm text-white/80">
-                    <FiSearch size={16} />
-                    Web Search
-                  </label>
-                  <button
-                    onClick={() => setGrounding(prev => ({ ...prev, enabled: !prev.enabled }))}
-                    className={`w-10 h-6 rounded-full transition-colors ${
-                      grounding.enabled ? 'bg-blue-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                      grounding.enabled ? 'translate-x-5' : 'translate-x-1'
-                    }`} />
-                  </button>
+              {/* Web Search Tag */}
+              {supportsGrounding && (
+                <button
+                  onClick={() => setGrounding(prev => ({ ...prev, enabled: !prev.enabled }))}
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all
+                    ${grounding.enabled 
+                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/50 shadow-md' 
+                      : 'bg-neutral-800/60 text-white/60 border border-white/10 hover:bg-neutral-700/60'
+                    }
+                  `}
+                >
+                  <TbBrandGoogle size={16} />
+                  Web Search
+                </button>
+              )}
+            </div>
+            
+            {/* Dynamic Threshold for Web Search */}
+            {grounding.enabled && selectedModelDef?.apiModel.includes('1.5') && (
+              <div className="mt-3 p-2 bg-neutral-800/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-white/60">Dynamic Threshold:</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={grounding.dynamicThreshold || 0.3}
+                    onChange={(e) => setGrounding(prev => ({ 
+                      ...prev, 
+                      dynamicThreshold: parseFloat(e.target.value) 
+                    }))}
+                    className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-xs text-white/60 w-8">
+                    {grounding.dynamicThreshold || 0.3}
+                  </span>
                 </div>
-                {grounding.enabled && selectedModelDef?.apiModel.includes('1.5') && (
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-white/60">Dynamic Threshold:</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={grounding.dynamicThreshold || 0.3}
-                      onChange={(e) => setGrounding(prev => ({ 
-                        ...prev, 
-                        dynamicThreshold: parseFloat(e.target.value) 
-                      }))}
-                      className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <span className="text-xs text-white/60 w-8">
-                      {grounding.dynamicThreshold || 0.3}
-                    </span>
-                  </div>
-                )}
               </div>
             )}
 
@@ -671,32 +675,41 @@ export default function PromptBar({
               ))}
             </div>
           )}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              logger.debug('PromptBar: Input changed', { 
-                length: e.target.value.length,
-                preview: e.target.value.substring(0, 50) + (e.target.value.length > 50 ? '...' : '')
-              });
-            }}
-            className="
-              w-full bg-transparent outline-none border-none text-base text-white
-              placeholder-gray-400/90 resize-none scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent
-            "
-            placeholder="Ask anything..."
-            disabled={isLoading}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                logger.debug('PromptBar: Enter key pressed, triggering LLM request');
-                handleAskLLM();
-              }
-            }}
-            rows={1}
-            style={{ minHeight: '2rem', lineHeight: 1.5, scrollbarColor: 'rgba(255,255,255,0.3) transparent', scrollbarWidth: 'thin' }}
-          />
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                logger.debug('PromptBar: Input changed', { 
+                  length: e.target.value.length,
+                  preview: e.target.value.substring(0, 50) + (e.target.value.length > 50 ? '...' : '')
+                });
+              }}
+              className="
+                w-full bg-white/5 backdrop-blur-sm outline-none border border-purple-500/20 
+                text-base text-white placeholder-purple-300/60 resize-none rounded-xl px-4 py-3
+                scrollbar-thin scrollbar-thumb-purple-500/30 scrollbar-track-transparent
+                focus:border-purple-500/40 focus:bg-white/10 transition-all
+              "
+              placeholder="Ask anything..."
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  logger.debug('PromptBar: Enter key pressed, triggering LLM request');
+                  handleAskLLM();
+                }
+              }}
+              rows={1}
+              style={{ 
+                minHeight: '2.5rem', 
+                lineHeight: 1.5, 
+                scrollbarColor: 'rgba(168, 85, 247, 0.3) transparent', 
+                scrollbarWidth: 'thin' 
+              }}
+            />
+          </div>
         </div>
         <div className="px-3 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -775,7 +788,7 @@ export default function PromptBar({
               }`}
               title="Advanced Options"
                           >
-                <FiSettings size={20} />
+                <IoOptionsOutline size={20} />
               </button>
             
             {/* Voice Recording Button */}

@@ -151,9 +151,21 @@ export default function NodeSidebar({
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
 
-  // Helper for model name (default Gemini)
-  const getModelName = () => 'Gemini 2.0 Flash';
-  const isGeminiModel = (model?: string) => (model || 'gemini-2.0-flash').toLowerCase().includes('gemini');
+  // Helper for model name with support for different models
+  const getModelName = (modelId?: string) => {
+    if (!modelId) return 'Gemini 2.0 Flash';
+    
+    // You can expand this to support more models
+    if (modelId.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
+    if (modelId.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro';
+    if (modelId.includes('gemini-1.5-flash')) return 'Gemini 1.5 Flash';
+    if (modelId.includes('gpt-4')) return 'GPT-4';
+    if (modelId.includes('claude')) return 'Claude';
+    
+    return modelId; // Fallback to model ID
+  };
+  
+  const isGeminiModel = (modelId?: string) => (modelId || 'gemini-2.0-flash').toLowerCase().includes('gemini');
 
   // Loading dots animation
   const LoadingDots = () => (
@@ -222,16 +234,16 @@ export default function NodeSidebar({
                   className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}
                 >
                   <div
-                    className={`relative max-w-[80%] px-4 py-3 rounded-2xl shadow-md text-base font-normal transition-all
+                    className={`relative max-w-[80%] px-4 py-3 rounded-2xl shadow-md text-base font-normal transition-all backdrop-blur-sm
                       ${isUser
-                        ? 'bg-blue-700/90 text-white border border-blue-400/30 ml-auto'
-                        : 'bg-neutral-900/90 text-white border border-neutral-700/40 mr-auto'}
+                        ? 'bg-purple-600/20 text-white border border-purple-400/30 ml-auto'
+                        : 'bg-white/5 text-white border border-white/10 mr-auto'}
                       ${contentHasMarkdown ? 'markdown-message' : ''}
                     `}
                     style={{ minWidth: 60 }}
                   >
-                    {isModel && isGeminiModel() && (
-                      <div className="absolute -top-5 -left-5 flex items-center" title={getModelName()}>
+                    {isModel && isGeminiModel((msg as any).modelId) && (
+                      <div className="absolute -top-5 -left-5 flex items-center" title={getModelName((msg as any).modelId)}>
                         <span className="group-hover:scale-110 transition-transform cursor-pointer">
                           <SiGooglegemini size={22} className="text-blue-300 drop-shadow-md" />
                         </span>
@@ -239,7 +251,7 @@ export default function NodeSidebar({
                     )}
                     <div className="flex items-center justify-between mb-1">
                       <div className="text-xs font-semibold text-gray-300/80">
-                        {isUser ? 'You' : getModelName()}
+                        {isUser ? 'You' : getModelName((msg as any).modelId)}
                       </div>
                       {/* Copy button for model responses */}
                       {isModel && (
@@ -352,7 +364,7 @@ export default function NodeSidebar({
           {/* Loading animation for current node */}
           {isActiveNodeLoading && (
             <div className="flex justify-start">
-              <div className="max-w-[80%] px-4 py-3 rounded-2xl shadow-md bg-neutral-900/90 border border-neutral-700/40 flex items-center gap-2">
+              <div className="max-w-[80%] px-4 py-3 rounded-2xl shadow-md bg-white/5 backdrop-blur-sm border border-white/10 flex items-center gap-2">
                 <div className="relative">
                   <span className="absolute -top-5 -left-5">
                     <SiGooglegemini size={22} className="text-blue-300 drop-shadow-md" title={getModelName()} />

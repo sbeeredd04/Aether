@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSearch, FiVolume2, FiUpload } from 'react-icons/fi';
+import { FaStop } from "react-icons/fa";
 import { IoOptionsOutline } from "react-icons/io5";
 import { LuBrain } from "react-icons/lu";
 import { TbBrandGoogle } from "react-icons/tb";
@@ -62,8 +63,14 @@ export default function PromptBar({
   // Drag and drop state
   const [isDragOver, setIsDragOver] = useState(false);
   
+  // Cancel request states
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [lastPrompt, setLastPrompt] = useState('');
+  const [lastAttachments, setLastAttachments] = useState<Attachment[]>([]);
+  
   const addMessageToNode = useChatStore((s) => s.addMessageToNode);
   const getPathToNode = useChatStore((s) => s.getPathToNode);
+  const removeLastMessageFromNode = useChatStore((s) => s.removeLastMessageFromNode);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -231,6 +238,35 @@ export default function PromptBar({
     }
   };
 
+  // Handle cancel request
+  const handleCancelRequest = () => {
+    logger.info('PromptBar: Canceling request', { nodeId: node.id });
+    
+    if (abortController) {
+      abortController.abort();
+      logger.debug('PromptBar: Abort signal sent');
+    }
+    
+    // Remove the user message that was added when request started
+    removeLastMessageFromNode(node.id);
+    
+    // Restore the input and attachments
+    setInput(lastPrompt);
+    setAttachments(lastAttachments);
+    
+    // Reset states
+    setIsLoading(false);
+    setAbortController(null);
+    setLastPrompt('');
+    setLastAttachments([]);
+    
+    logger.info('PromptBar: Request canceled and states restored', { 
+      nodeId: node.id,
+      restoredPromptLength: lastPrompt.length,
+      restoredAttachmentsCount: lastAttachments.length
+    });
+  };
+
   const handleAskLLM = async () => {
     logger.info('PromptBar: Starting LLM request', { 
       nodeId: node.id,
@@ -246,6 +282,14 @@ export default function PromptBar({
       logger.warn('PromptBar: Request blocked - no input or attachments');
       return;
     }
+    
+    // Save current state for potential restoration
+    setLastPrompt(input);
+    setLastAttachments([...attachments]);
+    
+    // Create abort controller for this request
+    const controller = new AbortController();
+    setAbortController(controller);
     
     setIsLoading(true);
     logger.debug('PromptBar: Loading state set to true');
@@ -317,10 +361,16 @@ export default function PromptBar({
 
       addMessageToNode(node.id, userMessage);
       
-      // Clear input and attachments
+      // Clear input and attachments immediately after adding message
       setInput('');
       setAttachments([]);
       logger.debug('PromptBar: Input and attachments cleared');
+
+      // Check if request was canceled during attachment processing
+      if (controller.signal.aborted) {
+        logger.info('PromptBar: Request was canceled during processing');
+        return;
+      }
 
       // Get conversation history
       logger.info('PromptBar: Retrieving conversation path', { nodeId: node.id });
@@ -411,11 +461,12 @@ export default function PromptBar({
         requestPayload.grounding = { enabled: true, dynamicThreshold: 0.3 };
       }
 
-      // Make API call
+      // Make API call with abort signal
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestPayload),
+        signal: controller.signal, // Add abort signal
       });
       
       logger.info('PromptBar: API response received', { 
@@ -528,6 +579,12 @@ export default function PromptBar({
       logger.info('PromptBar: Request completed successfully');
 
     } catch (error: any) {
+      // Handle aborted requests
+      if (error.name === 'AbortError') {
+        logger.info('PromptBar: Request was aborted by user');
+        return; // Don't add error message for user-initiated cancellation
+      }
+      
       logger.error('PromptBar: Request failed', { 
         error: error.message,
         stack: error.stack,
@@ -537,7 +594,10 @@ export default function PromptBar({
       addMessageToNode(node.id, { role: 'model', content: `Error: ${error.message}`, modelId: selectedModel });
     } finally {
       setIsLoading(false);
-      logger.debug('PromptBar: Loading state set to false');
+      setAbortController(null);
+      setLastPrompt('');
+      setLastAttachments([]);
+      logger.debug('PromptBar: Loading state set to false and cleanup completed');
     }
   };
 
@@ -547,7 +607,7 @@ export default function PromptBar({
     <div className="w-full flex justify-center items-end pointer-events-none">
       <div
         className={`
-          w-full max-w-3xl bg-neutral-900/80 backdrop-blur-md
+          w-full max-w-3xl bg-neutral-900/80 backdrop-blur-md border border-white/10
           rounded-2xl shadow-lg flex flex-col pointer-events-auto transition-colors
           ${isDragOver ? 'ring-2 ring-purple-400/50 bg-purple-900/20' : ''}
         `}
@@ -650,7 +710,7 @@ export default function PromptBar({
           </div>
         )}
 
-        <div className="p-3 flex-grow">
+        <div className="p-1 flex-grow">
           {attachments.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2">
               {attachments.map((att, index) => (
@@ -687,10 +747,10 @@ export default function PromptBar({
                 });
               }}
               className="
-                w-full bg-white/5 backdrop-blur-sm outline-none border border-purple-500/20 
+                w-full outline-none
                 text-base text-white placeholder-purple-300/60 resize-none rounded-xl px-4 py-3
                 scrollbar-thin scrollbar-thumb-purple-500/30 scrollbar-track-transparent
-                focus:border-purple-500/40 focus:bg-white/10 transition-all
+                transition-all
               "
               placeholder="Ask anything..."
               disabled={isLoading}
@@ -804,16 +864,20 @@ export default function PromptBar({
             </button>
             
             <button
-              onClick={handleAskLLM}
-              disabled={shouldDisableSend}
-              className="
-                w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-500 text-white
-                disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-600
+              onClick={isLoading ? handleCancelRequest : handleAskLLM}
+              disabled={shouldDisableSend && !isLoading}
+              className={`
+                w-9 h-9 rounded-full text-white
                 flex items-center justify-center transition-colors
-              "
+                ${isLoading 
+                  ? 'bg-red-600 hover:bg-red-500' 
+                  : 'bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-600'
+                }
+              `}
+              title={isLoading ? "Stop request" : "Send message"}
             >
               {isLoading ? (
-                <span className="animate-spin h-5 w-5 block border-2 border-t-transparent border-current rounded-full" />
+                <FaStop size={14} />
               ) : (
                 <FiSend size={18} />
               )}

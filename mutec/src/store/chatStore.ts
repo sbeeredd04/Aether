@@ -48,6 +48,7 @@ interface ChatState {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   addMessageToNode: (nodeId: string, message: ChatMessage, isPartial?: boolean) => void;
+  removeLastMessageFromNode: (nodeId: string) => void;
   createNodeAndEdge: (sourceNodeId: string, label: string, type: 'response' | 'branch') => string; // Return new nodeId
   getPathToNode: (targetNodeId: string) => ChatMessage[];
   getPathNodeIds: (targetNodeId: string) => string[];
@@ -628,6 +629,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!isPartial) {
       get().saveToSession();
     }
+  },
+
+  removeLastMessageFromNode: (nodeId) => {
+    logger.info('ChatStore: Removing last message from node', { nodeId });
+
+    set((state) => ({
+      nodes: state.nodes.map((node) => {
+        if (node.id === nodeId) {
+          const updatedChatHistory = node.data.chatHistory.slice(0, -1);
+          
+          logger.debug('ChatStore: Message removed from node', { 
+            nodeId,
+            previousLength: node.data.chatHistory.length,
+            newLength: updatedChatHistory.length
+          });
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              chatHistory: updatedChatHistory,
+            },
+          };
+        }
+        return node;
+      }),
+    }));
+    
+    // Save to session after removing message
+    get().saveToSession();
   },
 
   createNodeAndEdge: (sourceNodeId, label, type) => {

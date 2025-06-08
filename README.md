@@ -53,8 +53,9 @@ Mutec allows users to create branching conversations from any point in a chat hi
 - [ ] New Branch Redirection
 - [ ] Auto canvas restructuring
 
-### Future Enhancements
 
+### Future Enhancements
+- [ ] Thread naming ?
 - [ ] User authentication and profiles
 - [ ] Shareable conversation graphs
 - [ ] Export conversations to different formats

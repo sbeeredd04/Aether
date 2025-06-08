@@ -7,6 +7,7 @@ import { SiGooglegemini } from 'react-icons/si';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
 import AudioPlayer from './AudioPlayer';
 import Citations from './Citations';
+import CopyButton from './CopyButton';
 import logger from '../utils/logger';
 
 interface NodeSidebarProps {
@@ -236,8 +237,18 @@ export default function NodeSidebar({
                         </span>
                       </div>
                     )}
-                    <div className="text-xs font-semibold mb-1 text-gray-300/80">
-                      {isUser ? 'You' : getModelName()}
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-xs font-semibold text-gray-300/80">
+                        {isUser ? 'You' : getModelName()}
+                      </div>
+                      {/* Copy button for model responses */}
+                      {isModel && (
+                        <CopyButton 
+                          content={parsedContent?.hasThoughts ? parsedContent.answer || msg.content : msg.content} 
+                          size={12} 
+                          className="opacity-60 hover:opacity-100"
+                        />
+                      )}
                     </div>
 
                     {msg.attachments && msg.attachments.length > 0 && (

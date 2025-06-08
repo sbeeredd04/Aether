@@ -31,6 +31,15 @@ export type CustomNodeData = {
   chatHistory: ChatMessage[];
 };
 
+// Session storage interface
+interface SessionData {
+  nodes: Node<CustomNodeData>[];
+  edges: Edge[];
+  activeNodeId: string | null;
+  timestamp: number;
+  version: string;
+}
+
 interface ChatState {
   nodes: Node<CustomNodeData>[];
   edges: Edge[];
@@ -38,7 +47,7 @@ interface ChatState {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   addMessageToNode: (nodeId: string, message: ChatMessage, isPartial?: boolean) => void;
-  createNodeAndEdge: (sourceNodeId: string, label: string, type: 'response' | 'branch') => void;
+  createNodeAndEdge: (sourceNodeId: string, label: string, type: 'response' | 'branch') => string; // Return new nodeId
   getPathToNode: (targetNodeId: string) => ChatMessage[];
   getPathNodeIds: (targetNodeId: string) => string[];
   getPathEdgeIds: (targetNodeId: string) => string[];
@@ -52,6 +61,11 @@ interface ChatState {
   setActiveNodeId: (nodeId: string | null) => void;
   initializeChatManager: (apiKey: string) => void;
   sendMessageToNode: (nodeId: string, message: string) => Promise<void>;
+  // Session management methods
+  saveToSession: () => void;
+  loadFromSession: () => boolean;
+  clearSession: () => void;
+  copyToClipboard: (content: string) => Promise<void>;
 }
 
 const ROOT_NODE: Node<CustomNodeData> = {
@@ -61,6 +75,115 @@ const ROOT_NODE: Node<CustomNodeData> = {
   position: { x: 250, y: 50 },
 };
 
+const SESSION_STORAGE_KEY = 'mutec-chat-session';
+const SESSION_VERSION = '1.0.0';
+
+// Utility functions for session management
+const saveSessionData = (data: SessionData): boolean => {
+  try {
+    const serialized = JSON.stringify(data);
+    
+    // Check if data is too large (Chrome limit is ~5MB)
+    if (serialized.length > 4.5 * 1024 * 1024) { // 4.5MB to be safe
+      logger.warn('ChatStore: Session data too large, attempting to compress');
+      
+      // Try to save a compressed version with only essential data
+      const compressedData: SessionData = {
+        ...data,
+        nodes: data.nodes.map(node => ({
+          ...node,
+          data: {
+            ...node.data,
+            // Truncate very long messages to save space
+            chatHistory: node.data.chatHistory.map(msg => ({
+              ...msg,
+              content: msg.content.length > 10000 ? msg.content.substring(0, 10000) + '...[truncated]' : msg.content,
+              // Remove large attachments from session storage
+              attachments: msg.attachments?.filter(att => att.data.length < 100000) || []
+            }))
+          }
+        }))
+      };
+      
+      const compressedSerialized = JSON.stringify(compressedData);
+      if (compressedSerialized.length > 4.5 * 1024 * 1024) {
+        logger.error('ChatStore: Even compressed session data is too large');
+        return false;
+      }
+      
+      sessionStorage.setItem(SESSION_STORAGE_KEY, compressedSerialized);
+      logger.info('ChatStore: Session saved with compression');
+      return true;
+    }
+    
+    sessionStorage.setItem(SESSION_STORAGE_KEY, serialized);
+    logger.debug('ChatStore: Session saved successfully', { 
+      dataSize: serialized.length,
+      nodeCount: data.nodes.length,
+      edgeCount: data.edges.length
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'QuotaExceededError') {
+      logger.error('ChatStore: Session storage quota exceeded');
+      // Try to clear old data and save again
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        const retryData = JSON.stringify(data);
+        if (retryData.length <= 4.5 * 1024 * 1024) {
+          sessionStorage.setItem(SESSION_STORAGE_KEY, retryData);
+          logger.info('ChatStore: Session saved after clearing old data');
+          return true;
+        }
+      } catch (retryError) {
+        logger.error('ChatStore: Failed to save session even after clearing old data', { error: retryError });
+      }
+    } else {
+      logger.error('ChatStore: Failed to save session', { error });
+    }
+    return false;
+  }
+};
+
+const loadSessionData = (): SessionData | null => {
+  try {
+    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!stored) {
+      logger.debug('ChatStore: No session data found');
+      return null;
+    }
+    
+    const data: SessionData = JSON.parse(stored);
+    
+    // Validate session data
+    if (!data.nodes || !Array.isArray(data.nodes) || !data.edges || !Array.isArray(data.edges)) {
+      logger.warn('ChatStore: Invalid session data structure');
+      return null;
+    }
+    
+    // Check version compatibility
+    if (data.version !== SESSION_VERSION) {
+      logger.warn('ChatStore: Session version mismatch', { 
+        stored: data.version, 
+        current: SESSION_VERSION 
+      });
+      // For now, we'll still load it, but in future versions we might want to migrate
+    }
+    
+    logger.info('ChatStore: Session data loaded successfully', {
+      nodeCount: data.nodes.length,
+      edgeCount: data.edges.length,
+      activeNodeId: data.activeNodeId,
+      timestamp: new Date(data.timestamp).toISOString()
+    });
+    
+    return data;
+  } catch (error) {
+    logger.error('ChatStore: Failed to load session data', { error });
+    return null;
+  }
+};
+
 export const useChatStore = create<ChatState>((set, get) => ({
   nodes: [ROOT_NODE],
   edges: [],
@@ -68,6 +191,119 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activePath: {
     nodeIds: [],
     edgeIds: []
+  },
+
+  saveToSession: () => {
+    const state = get();
+    const sessionData: SessionData = {
+      nodes: state.nodes,
+      edges: state.edges,
+      activeNodeId: state.activeNodeId,
+      timestamp: Date.now(),
+      version: SESSION_VERSION
+    };
+    
+    saveSessionData(sessionData);
+  },
+
+  loadFromSession: () => {
+    const sessionData = loadSessionData();
+    if (!sessionData) {
+      return false;
+    }
+    
+    // Ensure root node exists
+    const hasRoot = sessionData.nodes.some(node => node.id === 'root');
+    if (!hasRoot) {
+      sessionData.nodes.unshift(ROOT_NODE);
+      logger.debug('ChatStore: Added missing root node to session data');
+    }
+    
+    set((state) => {
+      // Calculate active path after setting the new data
+      const getPathNodeIds = (targetNodeId: string): string[] => {
+        const path: string[] = [];
+        let currentId: string | undefined = targetNodeId;
+        
+        const incoming = new Map<string, string>();
+        sessionData.edges.forEach((edge) => {
+          incoming.set(edge.target, edge.source);
+        });
+        
+        while (currentId) {
+          path.unshift(currentId);
+          currentId = incoming.get(currentId);
+          if (!currentId) break;
+        }
+        
+        return path;
+      };
+      
+      const getPathEdgeIds = (targetNodeId: string): string[] => {
+        const nodeIds = getPathNodeIds(targetNodeId);
+        const edgeIds: string[] = [];
+        
+        for (let i = 0; i < nodeIds.length - 1; i++) {
+          const sourceId = nodeIds[i];
+          const targetId = nodeIds[i + 1];
+          
+          const edge = sessionData.edges.find(e => e.source === sourceId && e.target === targetId);
+          if (edge) {
+            edgeIds.push(edge.id);
+          }
+        }
+        
+        return edgeIds;
+      };
+      
+      return {
+        nodes: sessionData.nodes,
+        edges: sessionData.edges,
+        activeNodeId: sessionData.activeNodeId,
+        activePath: sessionData.activeNodeId ? {
+          nodeIds: getPathNodeIds(sessionData.activeNodeId),
+          edgeIds: getPathEdgeIds(sessionData.activeNodeId)
+        } : { nodeIds: [], edgeIds: [] }
+      };
+    });
+    
+    logger.info('ChatStore: Session restored successfully');
+    return true;
+  },
+
+  clearSession: () => {
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      logger.info('ChatStore: Session cleared');
+    } catch (error) {
+      logger.error('ChatStore: Failed to clear session', { error });
+    }
+  },
+
+  copyToClipboard: async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      logger.debug('ChatStore: Content copied to clipboard', { 
+        contentLength: content.length,
+        contentPreview: content.substring(0, 100) + (content.length > 100 ? '...' : '')
+      });
+    } catch (error) {
+      logger.error('ChatStore: Failed to copy to clipboard', { error });
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = content;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        logger.debug('ChatStore: Content copied to clipboard using fallback method');
+      } catch (fallbackError) {
+        logger.error('ChatStore: Fallback copy method also failed', { error: fallbackError });
+        throw fallbackError;
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    }
   },
 
   initializeChatManager: (apiKey: string) => {
@@ -115,6 +351,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       state.addMessageToNode(nodeId, { role: 'model', content: response });
       logger.debug('ChatStore: Model response added to node', { nodeId });
+      
+      // Save to session after successful message
+      state.saveToSession();
     } catch (error) {
       logger.error('ChatStore: sendMessage failed', { 
         nodeId, 
@@ -209,6 +448,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   
       return newState;
     });
+    
+    // Save to session after node changes
+    get().saveToSession();
   },
 
   onEdgesChange: (changes) => {
@@ -276,6 +518,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return newState;
     });
+    
+    // Save to session after node reset
+    get().saveToSession();
   },
 
   addMessageToNode: (nodeId, message, isPartial = false) => {
@@ -339,6 +584,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     : n
                 )
               }));
+              
+              // Save to session after title update
+              get().saveToSession();
             }).catch(error => {
               logger.error('ChatStore: Title generation failed', { 
                 nodeId, 
@@ -356,6 +604,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     : n
                 )
               }));
+              
+              // Save to session after fallback title
+              get().saveToSession();
             });
           }
 
@@ -370,6 +621,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return node;
       }),
     }));
+    
+    // Save to session after adding message (but not for partial updates to avoid too many saves)
+    if (!isPartial) {
+      get().saveToSession();
+    }
   },
 
   createNodeAndEdge: (sourceNodeId, label, type) => {
@@ -382,7 +638,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const sourceNode = get().nodes.find((n) => n.id === sourceNodeId);
     if (!sourceNode) {
       logger.error('ChatStore: Source node not found', { sourceNodeId });
-      return;
+      return '';
     }
 
     const newNodeId = nanoid();
@@ -425,6 +681,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return newState;
     });
+
+    // Save to session after creating node and edge
+    get().saveToSession();
+    
+    // Automatically set the new node as active for branch redirection
+    const { setActiveNodeId } = get();
+    setActiveNodeId(newNodeId);
+    
+    logger.info('ChatStore: New node set as active', { newNodeId });
+
+    return newNodeId;
   },
 
   getPathNodeIds: (targetNodeId) => {
@@ -606,6 +873,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return newState;
     });
+    
+    // Save to session after node deletion
+    get().saveToSession();
   },
 
   activeNodeId: null,
@@ -621,6 +891,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeNodeId: null,
         activePath: { nodeIds: [], edgeIds: [] }
       });
+      get().saveToSession();
       return;
     }
     
@@ -642,5 +913,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeNodeId: nodeId,
       activePath: { nodeIds, edgeIds }
     });
+    
+    // Save to session when active node changes
+    get().saveToSession();
   },
 })); 

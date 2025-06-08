@@ -7,6 +7,7 @@ import { FiPlus, FiRefreshCw, FiTrash2, FiFileText } from 'react-icons/fi';
 import { SiGooglegemini } from 'react-icons/si';
 import logger from '@/utils/logger';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
+import CopyButton from './CopyButton';
 
 function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[] {
   // Returns an array of node IDs from root to targetId
@@ -91,7 +92,11 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
   }, [id, input, addMessageToNode, sendMessageToNode]);
 
   const handleBranch = useCallback(() => {
-    createNodeAndEdge(id, 'New Chat', 'branch');
+    const newNodeId = createNodeAndEdge(id, 'New Chat', 'branch');
+    logger.info('CustomChatNode: Branch created', { 
+      sourceNodeId: id, 
+      newNodeId 
+    });
   }, [id, createNodeAndEdge]);
 
   const handleReset = useCallback(() => {
@@ -238,7 +243,7 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
               ))}
             </div>
           )}
-          <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent"
+          <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent relative"
             style={{ scrollbarColor: 'rgba(255,255,255,0.7) transparent', scrollbarWidth: 'thin' }}
           >
             {responseHasMarkdown ? (
@@ -247,6 +252,17 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
               </div>
             ) : (
               <>{lastModelResponse}</>
+            )}
+            
+            {/* Copy button for model responses */}
+            {hasResponse && !isLoading && (
+              <div className="absolute top-2 right-2">
+                <CopyButton 
+                  content={lastModelResponse} 
+                  size={14} 
+                  className="opacity-60 hover:opacity-100"
+                />
+              </div>
             )}
             
             {/* Gemini logo at bottom right if Gemini model */}

@@ -36,6 +36,7 @@ export default function WorkspacePage() {
   const deleteNodeAndDescendants = useChatStore(s => s.deleteNodeAndDescendants);
   const createNodeAndEdge = useChatStore(s => s.createNodeAndEdge);
   const setActiveNodeId = useChatStore(s => s.setActiveNodeId);
+  const loadFromSession = useChatStore(s => s.loadFromSession);
   
   const activeNode = nodes.find(n => n.id === activeNodeId);
   const isRootNode = activeNodeId === 'root';
@@ -47,13 +48,20 @@ export default function WorkspacePage() {
     }
   }, [activeNodeId]);
 
-  // Load last health check report on mount
+  // Load session and health check report on mount
   useEffect(() => {
+    // Load previous session if available
+    const sessionLoaded = loadFromSession();
+    if (sessionLoaded) {
+      console.log('Session restored successfully');
+    }
+    
+    // Load last health check report
     const lastReport = getLastHealthCheckReport();
     if (lastReport) {
       setHealthCheckReport(lastReport);
     }
-  }, []);
+  }, [loadFromSession]);
 
   // Health check handler
   const handleHealthCheck = async () => {
@@ -138,7 +146,8 @@ export default function WorkspacePage() {
   
   const handleBranch = () => {
     if (activeNodeId) {
-      createNodeAndEdge(activeNodeId, 'New Chat', 'branch');
+      const newNodeId = createNodeAndEdge(activeNodeId, 'New Chat', 'branch');
+      console.log('Branch created:', { sourceNodeId: activeNodeId, newNodeId });
     }
   };
 

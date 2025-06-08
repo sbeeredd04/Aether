@@ -44,11 +44,11 @@ Mutec allows users to create branching conversations from any point in a chat hi
 - [✓] Add model badges to nodes to show which AI model answered the question
 - [✓] Implement markdown rendering for model outputs
 - [ ] Multiple models and their support 
-    - [ ] Add multiple models and their support placeholders to the prompt bar
-    - [ ] document support / File upload
-    - [ ] grounding with google search
-    - [ ] add image generation and video generation and speech geneeration as well
-    - [ ] video and sccreen sharing understanding and support / Live API
+    - [✓] Add multiple models and their support placeholders to the prompt bar
+    - [ ] document support / File upload (Using files api for larger files)
+    - [✓] grounding with google search
+    - [✓] add image generation
+    - [ ] video and sccreen sharing understanding and support / Live API (Websocket)
 
 
 ### Future Enhancements

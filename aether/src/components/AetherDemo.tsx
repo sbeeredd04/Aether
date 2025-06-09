@@ -197,17 +197,20 @@ const initialEdges: Edge[] = [
   },
 ];
 
-export default function MutecDemo() {
+export default function AetherDemo() {
   return (
-    <div className="w-full h-full flex bg-gradient-to-br from-purple-900/20 to-blue-900/20 rounded-2xl overflow-hidden border border-white/20">
-      {/* Canvas Area */}
-      <div className="flex-1 relative">
+    <div className="flex gap-4 h-full w-full">
+      {/* Main demo canvas */}
+      <div className="flex-1 h-full">
         <ReactFlow
           nodes={initialNodes}
           edges={initialEdges}
           nodeTypes={nodeTypes}
           fitView
-          attributionPosition="bottom-left"
+          minZoom={0.5}
+          maxZoom={1.5}
+          proOptions={{ hideAttribution: true }}
+          className="bg-transparent"
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
@@ -215,21 +218,11 @@ export default function MutecDemo() {
           zoomOnScroll={false}
           zoomOnPinch={false}
           zoomOnDoubleClick={false}
-          className="bg-transparent"
-        >
-          <div className="absolute top-3 left-3 z-10">
-            <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
-              <div className="text-white/80 text-xs font-medium">Interactive Demo</div>
-              <div className="text-white/60 text-xs">Try branching conversations →</div>
-            </div>
-          </div>
-        </ReactFlow>
+        />
       </div>
       
-      {/* Demo Sidebar */}
-      <div className="w-64 p-3">
-        <DemoSidebar />
-      </div>
+      {/* Demo sidebar */}
+      <DemoSidebar />
     </div>
   );
 } 

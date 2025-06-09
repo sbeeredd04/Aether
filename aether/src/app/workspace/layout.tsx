@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Workspace | Mutec',
-  description: 'Your AI-powered workspace',
+  title: 'Workspace | Aether AI',
+  description: 'Your Aether AI-powered workspace for visual conversations',
 };
 
 export const viewport: Viewport = {

@@ -76,7 +76,7 @@ async function testModelWithTimeout(
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
     
     // Get API key from localStorage
-    const savedSettings = localStorage.getItem('mutec-settings');
+    const savedSettings = localStorage.getItem('aether-settings');
     if (!savedSettings) {
       return {
         success: false,

@@ -77,7 +77,7 @@ const ROOT_NODE: Node<CustomNodeData> = {
   position: { x: 250, y: 50 },
 };
 
-const SESSION_STORAGE_KEY = 'mutec-chat-session';
+const SESSION_STORAGE_KEY = 'aether-chat-session';
 const SESSION_VERSION = '1.0.0';
 
 // Utility functions for session management
@@ -717,7 +717,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Save to session after creating node and edge
     get().saveToSession();
-
+    
     return newNodeId;
   },
 

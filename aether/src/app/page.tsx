@@ -6,7 +6,7 @@ import { FiSettings, FiLayers, FiZap } from 'react-icons/fi';
 import { SiTypescript, SiNextdotjs, SiTailwindcss } from 'react-icons/si';
 import { useState, useEffect } from 'react';
 import Silk from '@/components/ui/Silk';
-import MutecDemo from '@/components/MutecDemo';
+import AetherDemo from '@/components/AetherDemo';
 
 export default function LandingPage() {
   const [isStarred, setIsStarred] = useState(false);
@@ -16,7 +16,7 @@ export default function LandingPage() {
   useEffect(() => {
     const fetchStarCount = async () => {
       try {
-        const response = await fetch('https://api.github.com/repos/sbeeredd04/Mutec');
+        const response = await fetch('https://api.github.com/repos/sbeeredd04/Aether');
         const data = await response.json();
         setStarCount(data.stargazers_count || '0');
       } catch (error) {
@@ -27,13 +27,13 @@ export default function LandingPage() {
   }, []);
 
   const handleGitHubStar = async () => {
-    window.open('https://github.com/sbeeredd04/Mutec', '_blank');
+    window.open('https://github.com/sbeeredd04/Aether', '_blank');
     setIsStarred(true);
   };
 
   const handleDirectStar = async () => {
     // GitHub's star API requires authentication, so we'll redirect to the star page
-    window.open('https://github.com/sbeeredd04/Mutec/stargazers', '_blank');
+    window.open('https://github.com/sbeeredd04/Aether/stargazers', '_blank');
     setIsStarred(true);
   };
 
@@ -127,8 +127,8 @@ export default function LandingPage() {
               {/* Header */}
               <header className="p-6 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <img src="/vercel.svg" alt="Mutec" className="w-8 h-8 invert" />
-                  <span className="text-2xl font-bold text-white">Mutec</span>
+                  <img src="/vercel.svg" alt="Aether AI" className="w-8 h-8 invert" />
+                  <span className="text-2xl font-bold text-white">Aether AI</span>
                 </div>
                 
                 <div className="flex items-center gap-4">
@@ -176,7 +176,7 @@ export default function LandingPage() {
                     </Link>
                     
                     <a
-                      href="https://github.com/sbeeredd04/Mutec"
+                      href="https://github.com/sbeeredd04/Aether"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="bg-white/10 backdrop-blur-sm border border-white/20 text-white font-bold text-xl px-12 py-6 rounded-full hover:bg-white/20 transition-all duration-300 flex items-center gap-4"
@@ -193,12 +193,12 @@ export default function LandingPage() {
                       <div className="w-3 h-3 rounded-full bg-red-500"></div>
                       <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                       <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                      <span className="text-white/60 text-sm ml-4">Mutec Interface Preview</span>
+                      <span className="text-white/60 text-sm ml-4">Aether AI Interface Preview</span>
                     </div>
                     
                     {/* Demo Container */}
                     <div className="h-96 w-full">
-                      <MutecDemo />
+                                              <AetherDemo />
                     </div>
                     
                     {/* How it Works Explanation */}
@@ -246,7 +246,7 @@ export default function LandingPage() {
                     Perfect For
                   </h2>
                   <p className="text-xl text-white/80 mb-12 max-w-3xl mx-auto">
-                    Discover the endless possibilities with Mutec's visual conversation approach
+                    Discover the endless possibilities with Aether AI's visual conversation approach
                   </p>
                 </div>
 
@@ -275,7 +275,7 @@ export default function LandingPage() {
               <div className="container mx-auto px-6 max-w-6xl">
                 <div className="text-center mb-16">
                   <h2 className="text-5xl md:text-6xl font-bold text-white mb-8">
-                    Why Choose Mutec?
+                    Why Choose Aether?
                   </h2>
                   <p className="text-xl text-white/80 mb-12 max-w-3xl mx-auto">
                     Experience the next generation of AI interaction with powerful features designed for modern workflows
@@ -312,7 +312,7 @@ export default function LandingPage() {
                   </h2>
                   <p className="text-2xl text-white/80 mb-16 max-w-4xl mx-auto leading-relaxed">
                     Join thousands of users who are already exploring new dimensions of AI interaction.
-                    Start your journey today with Mutec's revolutionary visual approach.
+                    Start your journey today with Aether AI's revolutionary visual approach.
                   </p>
                   
                   <div className="flex flex-col sm:flex-row gap-8 justify-center items-center mb-16">
@@ -331,7 +331,7 @@ export default function LandingPage() {
                       <div className="flex-1 text-left">
                         <h3 className="text-3xl font-bold text-white mb-4">Open Source & Free</h3>
                         <p className="text-white/80 text-lg mb-6">
-                          Mutec is completely open source. Contribute, customize, or simply explore the code. 
+                          Aether AI is completely open source. Contribute, customize, or simply explore the code. 
                           We believe in transparency and community-driven development.
                         </p>
                         <div className="flex flex-wrap gap-4">
@@ -362,7 +362,7 @@ export default function LandingPage() {
                           Star Repository
                         </button>
                         <a
-                          href="https://github.com/sbeeredd04/Mutec"
+                          href="https://github.com/sbeeredd04/Aether"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold px-8 py-4 rounded-full transition-all duration-300 flex items-center gap-3"
@@ -383,7 +383,7 @@ export default function LandingPage() {
               <div className="container mx-auto px-6 text-center">
                 <div className="flex justify-center items-center gap-8 text-white/60 mb-6">
                   <a
-                    href="https://github.com/sbeeredd04/Mutec"
+                    href="https://github.com/sbeeredd04/Aether"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-white transition-colors flex items-center gap-2"
@@ -396,7 +396,7 @@ export default function LandingPage() {
                     Get Started
                   </Link>
                   <span>•</span>
-                  <span>© 2025 Mutec</span>
+                  <span>© 2025 Aether AI</span>
                   <span>•</span>
                   <span>Open Source</span>
                 </div>

@@ -47,7 +47,7 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
 
   // Initialize chat manager when component mounts
   useEffect(() => {
-    const savedSettings = localStorage.getItem('mutec-settings');
+    const savedSettings = localStorage.getItem('aether-settings');
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
       if (settings.apiKey) {

@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Define a metallic gradient for the strokes -->
+  <defs>
+    <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#AAA" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#FFF" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- First ellipse, rotated 45° -->
+  <ellipse
+    cx="256" cy="256" rx="180" ry="100"
+    fill="none"
+    stroke="url(#metalGrad)"
+    stroke-width="20"
+    transform="rotate(45 256 256)"
+  />
+
+  <!-- Second ellipse, rotated -45° -->
+  <ellipse
+    cx="256" cy="256" rx="180" ry="100"
+    fill="none"
+    stroke="url(#metalGrad)"
+    stroke-width="20"
+    transform="rotate(-45 256 256)"
+  />
+</svg>

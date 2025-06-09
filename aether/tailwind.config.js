@@ -6,7 +6,12 @@ module.exports = {
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        'space-grotesk': ['var(--font-space-grotesk)', 'sans-serif'],
+        'major-mono': ['var(--font-major-mono)', 'monospace'],
+      },
+    },
   },
   plugins: [
     require('tailwind-scrollbar'),

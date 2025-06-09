@@ -6,9 +6,10 @@ import NodeSidebar from '@/components/NodeSidebar';
 import PromptBar from '@/components/PromptBar';
 import { useChatStore } from '@/store/chatStore';
 import { FiSettings, FiHome } from 'react-icons/fi';
-import { FaInfo } from 'react-icons/fa';
+import { FaInfo, FaGithub, FaExternalLinkAlt } from 'react-icons/fa';
 import { BsLayoutSidebarInsetReverse } from "react-icons/bs";
 import Link from 'next/link';
+import Image from 'next/image';
 import SettingsPanel from '@/components/SettingsPanel';
 import VoiceInputModal from '@/components/VoiceInputModal';
 import ImageModal from '@/components/ImageModal';
@@ -16,7 +17,7 @@ import ModelInfoModal from '@/components/ModelInfoModal';
 
 export default function WorkspacePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(500); // Increased default width
+  const [sidebarWidth, setSidebarWidth] = useState(600); // Increased default width for better readability
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showModelInfo, setShowModelInfo] = useState(false);
@@ -150,7 +151,19 @@ export default function WorkspacePage() {
   return (
     <main className="bg-[#000000] h-screen flex flex-col relative overflow-hidden">
       {/* Top control bar */}
-      <div className="absolute top-4 left-4 flex gap-3 z-50">
+      <div className="absolute top-4 left-4 flex gap-3 z-50 items-center">
+        {/* Aether Logo */}
+        <div className="flex items-center gap-3 bg-black/30 backdrop-blur-sm px-3 py-2 rounded-md">
+          <Image
+            src="/aether.svg"
+            alt="Aether AI"
+            width={40}
+            height={40}
+            className="text-white"
+          />
+          <span className="text-white font-major-mono text-3xl font-normal">Aether</span>
+        </div>
+        
         <Link
           href="/"
           className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md"
@@ -240,6 +253,38 @@ export default function WorkspacePage() {
           voiceTranscript={voiceTranscript}
           onClearVoiceTranscript={clearVoiceTranscript}
         />
+      </div>
+
+      {/* Footer */}
+      <div className="absolute bottom-4 right-4 z-40">
+        <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-lg px-4 py-2">
+          <div className="flex items-center gap-3 text-sm text-white/70">
+            <span className="font-space-grotesk">Developed by</span>
+            <div className="flex items-center gap-2">
+              <span className="font-space-grotesk font-medium text-white/90">Sri Ujjwal Reddy</span>
+              <div className="flex items-center gap-2">
+                <a
+                  href="https://github.com/sbeeredd04"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/60 hover:text-white transition-colors"
+                  aria-label="GitHub Profile"
+                >
+                  <FaGithub size={16} />
+                </a>
+                <a
+                  href="https://sriujjwalreddy.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/60 hover:text-white transition-colors"
+                  aria-label="Portfolio Website"
+                >
+                  <FaExternalLinkAlt size={14} />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       
       {/* Settings panel */}

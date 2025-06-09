@@ -177,14 +177,17 @@ export default function NodeSidebar({
   );
 
   return (
-    <div className="h-full flex flex-col bg-black/40 rounded-xl border border-white/10 shadow-xl" style={{ width }}>
+    <div 
+      className="h-full flex flex-col bg-black/40 rounded-xl border border-white/10 shadow-xl sidebar-space-grotesk" 
+      style={{ width }}
+    >
       <div className="p-4 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="font-semibold text-lg text-white truncate group relative">
+          <h2 className="font-semibold text-lg text-white truncate group relative font-space-grotesk">
             {data?.label || 'New Chat'}
             {/* Tooltip for long titles */}
             {data?.label && data.label.length > 30 && (
-              <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50">
+              <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50 font-space-grotesk">
                 {data.label}
               </div>
             )}
@@ -194,22 +197,22 @@ export default function NodeSidebar({
           </button>
         </div>
         {data?.chatHistory.length > 0 && (
-          <div className="text-sm text-white/50">
+          <div className="text-sm text-white/50 font-space-grotesk">
             {data.chatHistory.length} messages in this conversation
           </div>
         )}
       </div>
       <div className="flex gap-3 px-4 py-2 border-b border-white/10 bg-black/20">
         {hasResponse && (
-          <button onClick={onBranch} className="text-purple-300 hover:text-purple-200 flex items-center gap-1" title="Branch Chat">
+          <button onClick={onBranch} className="text-purple-300 hover:text-purple-200 flex items-center gap-1 font-space-grotesk" title="Branch Chat">
             <FiPlus size={16} /> Branch
           </button>
         )}
-        <button onClick={onReset} className="text-blue-300 hover:text-blue-200 flex items-center gap-1" title="Reset Node">
+        <button onClick={onReset} className="text-blue-300 hover:text-blue-200 flex items-center gap-1 font-space-grotesk" title="Reset Node">
           <FiRefreshCw size={16} /> Reset
         </button>
         {!isRootNode && (
-          <button onClick={onDelete} className="text-red-300 hover:text-red-200 flex items-center gap-1" title="Delete Node">
+          <button onClick={onDelete} className="text-red-300 hover:text-red-200 flex items-center gap-1 font-space-grotesk" title="Delete Node">
             <FiTrash2 size={16} /> Delete
           </button>
         )}
@@ -250,7 +253,7 @@ export default function NodeSidebar({
                       </div>
                     )}
                     <div className="flex items-center justify-between mb-1">
-                      <div className="text-xs font-semibold text-gray-300/80">
+                      <div className="text-xs font-semibold text-gray-300/80 font-space-grotesk">
                         {isUser ? 'You' : getModelName((msg as any).modelId)}
                       </div>
                       {/* Copy button for model responses */}
@@ -300,21 +303,21 @@ export default function NodeSidebar({
                       <div className="mb-2">
                         <button
                           onClick={() => toggleThoughts(idx)}
-                          className="flex items-center gap-2 text-xs text-blue-300 hover:text-blue-200 transition-colors"
+                          className="flex items-center gap-2 text-xs text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk"
                         >
                           {isThoughtsExpanded ? <FiChevronDown size={14} /> : <FiChevronRight size={14} />}
                           {isThoughtsExpanded ? 'Hide' : 'Show'} Thoughts
                         </button>
                         {isThoughtsExpanded && (
                           <div className="mt-2 p-3 bg-black/20 rounded-lg border border-blue-500/20">
-                            <div className="text-xs font-semibold text-blue-300 mb-2">Thoughts:</div>
-                            <div className="text-sm text-white/80">
+                            <div className="text-xs font-semibold text-blue-300 mb-2 font-space-grotesk">Thoughts:</div>
+                            <div className="text-sm text-white/80 font-space-grotesk">
                               {hasMarkdown(parsedContent.thoughts) ? (
-                                <div className="markdown-content">
+                                <div className="markdown-content font-space-grotesk">
                                   <MarkdownRenderer content={parsedContent.thoughts} />
                                 </div>
                               ) : (
-                                <div className="whitespace-pre-wrap">{parsedContent.thoughts}</div>
+                                <div className="whitespace-pre-wrap font-space-grotesk">{parsedContent.thoughts}</div>
                               )}
                             </div>
                           </div>
@@ -326,20 +329,20 @@ export default function NodeSidebar({
                     {isModel && parsedContent?.hasThoughts ? (
                       // Show only the answer part if thoughts are present
                       parsedContent.answer && (contentHasMarkdown ? (
-                        <div className="markdown-content">
+                        <div className="markdown-content font-space-grotesk">
                           <MarkdownRenderer content={parsedContent.answer} />
                         </div>
                       ) : (
-                        <div className="whitespace-pre-wrap">{parsedContent.answer}</div>
+                        <div className="whitespace-pre-wrap font-space-grotesk">{parsedContent.answer}</div>
                       ))
                     ) : (
                       // Show full content for non-thinking responses
                       isModel && contentHasMarkdown ? (
-                        <div className="markdown-content">
+                        <div className="markdown-content font-space-grotesk">
                           <MarkdownRenderer content={msg.content} />
                         </div>
                       ) : (
-                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                        <div className="whitespace-pre-wrap font-space-grotesk">{msg.content}</div>
                       )
                     )}
 
@@ -359,7 +362,7 @@ export default function NodeSidebar({
               );
             })
           ) : (
-            <div className="text-center text-gray-400 py-8">No messages in this conversation yet</div>
+            <div className="text-center text-gray-400 py-8 font-space-grotesk">No messages in this conversation yet</div>
           )}
           {/* Loading animation for current node */}
           {isActiveNodeLoading && (
@@ -374,6 +377,8 @@ export default function NodeSidebar({
               </div>
             </div>
           )}
+          {/* Bottom margin for conversation */}
+          <div className="h-8"></div>
         </div>
       </div>
     </div>

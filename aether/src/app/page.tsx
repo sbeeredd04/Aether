@@ -127,8 +127,8 @@ export default function LandingPage() {
               {/* Header */}
               <header className="p-6 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <img src="/vercel.svg" alt="Aether AI" className="w-8 h-8 invert" />
-                  <span className="text-2xl font-bold text-white">Aether AI</span>
+                  <img src="/aether.svg" alt="Aether AI" className="w-12 h-12" />
+                  <span className="text-4xl font-bold text-white font-major-mono">Aether</span>
                 </div>
                 
                 <div className="flex items-center gap-4">
@@ -154,14 +154,14 @@ export default function LandingPage() {
               {/* Hero Content */}
               <div className="flex-1 container mx-auto px-6 flex flex-col justify-center max-w-6xl">
                 <div className="text-center mb-12">
-                  <h1 className="text-6xl md:text-8xl font-bold text-white mb-8 leading-tight">
-                    Visual AI{' '}
+                  <h1 className="text-6xl md:text-8xl font-bold text-white mb-8 leading-tight font-major-mono">
+                  Chat{' '}
                     <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-                      Conversations
+                      Multiverse
                     </span>
                   </h1>
                   
-                  <p className="text-2xl md:text-3xl text-white/80 mb-12 max-w-4xl mx-auto leading-relaxed">
+                  <p className="text-2xl md:text-3xl text-white/80 mb-12 max-w-4xl mx-auto leading-relaxed font-space-grotesk">
                     Transform your AI conversations into explorable trees of thought. 
                     Create, branch, and navigate multi-threaded discussions like never before.
                   </p>
@@ -242,10 +242,10 @@ export default function LandingPage() {
             <section className="min-h-screen flex flex-col justify-center">
               <div className="container mx-auto px-6 max-w-6xl">
                 <div className="text-center mb-16">
-                  <h2 className="text-5xl md:text-6xl font-bold text-white mb-8">
+                  <h2 className="text-5xl md:text-6xl font-bold text-white mb-8 font-major-mono">
                     Perfect For
                   </h2>
-                  <p className="text-xl text-white/80 mb-12 max-w-3xl mx-auto">
+                  <p className="text-xl text-white/80 mb-12 max-w-3xl mx-auto font-space-grotesk">
                     Discover the endless possibilities with Aether AI's visual conversation approach
                   </p>
                 </div>
@@ -260,7 +260,7 @@ export default function LandingPage() {
                         <div className="text-2xl flex-shrink-0">
                           {useCase.icon}
                         </div>
-                        <div className="text-white/90 text-xl font-medium">
+                        <div className="text-white/90 text-xl font-medium font-space-grotesk">
                           {useCase.text}
                         </div>
                       </div>
@@ -274,10 +274,10 @@ export default function LandingPage() {
             <section className="min-h-screen flex flex-col justify-center">
               <div className="container mx-auto px-6 max-w-6xl">
                 <div className="text-center mb-16">
-                  <h2 className="text-5xl md:text-6xl font-bold text-white mb-8">
+                  <h2 className="text-5xl md:text-6xl font-bold text-white mb-8 font-major-mono">
                     Why Choose Aether?
                   </h2>
-                  <p className="text-xl text-white/80 mb-12 max-w-3xl mx-auto">
+                  <p className="text-xl text-white/80 mb-12 max-w-3xl mx-auto font-space-grotesk">
                     Experience the next generation of AI interaction with powerful features designed for modern workflows
                   </p>
                 </div>
@@ -290,11 +290,11 @@ export default function LandingPage() {
                     >
                       <div className="flex items-center gap-4 mb-6">
                         <div className="text-3xl">{feature.icon}</div>
-                        <h3 className="text-xl font-bold text-white">
+                        <h3 className="text-xl font-bold text-white font-major-mono">
                           {feature.title}
                         </h3>
                       </div>
-                      <p className="text-white/80 leading-relaxed text-lg">
+                      <p className="text-white/80 leading-relaxed text-lg font-space-grotesk">
                         {feature.description}
                       </p>
                     </div>
@@ -307,10 +307,10 @@ export default function LandingPage() {
             <section className="min-h-screen flex flex-col justify-center">
               <div className="container mx-auto px-6 max-w-6xl">
                 <div className="text-center">
-                  <h2 className="text-5xl md:text-6xl font-bold text-white mb-8">
+                  <h2 className="text-5xl md:text-6xl font-bold text-white mb-8 font-major-mono">
                     Ready to Transform Your AI Conversations?
                   </h2>
-                  <p className="text-2xl text-white/80 mb-16 max-w-4xl mx-auto leading-relaxed">
+                  <p className="text-2xl text-white/80 mb-16 max-w-4xl mx-auto leading-relaxed font-space-grotesk">
                     Join thousands of users who are already exploring new dimensions of AI interaction.
                     Start your journey today with Aether AI's revolutionary visual approach.
                   </p>
@@ -329,8 +329,8 @@ export default function LandingPage() {
                   <div className="bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-md rounded-3xl border border-white/10 p-12 max-w-4xl mx-auto">
                     <div className="flex flex-col md:flex-row items-center gap-8">
                       <div className="flex-1 text-left">
-                        <h3 className="text-3xl font-bold text-white mb-4">Open Source & Free</h3>
-                        <p className="text-white/80 text-lg mb-6">
+                        <h3 className="text-3xl font-bold text-white mb-4 font-major-mono">Open Source & Free</h3>
+                        <p className="text-white/80 text-lg mb-6 font-space-grotesk">
                           Aether AI is completely open source. Contribute, customize, or simply explore the code. 
                           We believe in transparency and community-driven development.
                         </p>
@@ -381,7 +381,7 @@ export default function LandingPage() {
             {/* Footer */}
             <footer className="py-12 border-t border-white/10">
               <div className="container mx-auto px-6 text-center">
-                <div className="flex justify-center items-center gap-8 text-white/60 mb-6">
+                <div className="flex justify-center items-center gap-6 text-white/60 mb-6 flex-wrap">
                   <a
                     href="https://github.com/sbeeredd04/Aether"
                     target="_blank"
@@ -400,7 +400,33 @@ export default function LandingPage() {
                   <span>•</span>
                   <span>Open Source</span>
                 </div>
-                <p className="text-white/40 text-sm flex items-center justify-center gap-2">
+                <div className="flex items-center justify-center gap-3 text-white/70 mb-4">
+                  <span className="font-space-grotesk">Developed by</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-space-grotesk font-medium text-white/90">Sri Ujjwal Reddy</span>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href="https://github.com/sbeeredd04"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white/60 hover:text-white transition-colors"
+                        aria-label="GitHub Profile"
+                      >
+                        <FaGithub size={16} />
+                      </a>
+                      <a
+                        href="https://sriujjwalreddy.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white/60 hover:text-white transition-colors"
+                        aria-label="Portfolio Website"
+                      >
+                        <FaUpRightFromSquare size={14} />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-white/40 text-sm flex items-center justify-center gap-2 font-space-grotesk">
                   Made with <FaHeart className="text-red-400" size={14} /> for the AI community
                 </p>
               </div>

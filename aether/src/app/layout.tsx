@@ -1,39 +1,35 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Aether AI - Visual AI Conversations",
+  title: "Aether AI - Chat Multiverse",
   description: "Transform your AI conversations into explorable trees of thought. Create, branch, and navigate multi-threaded discussions with advanced AI models.",
   themeColor: "#10131a",
   keywords: "AI, chat, conversation, branching, multi-threaded, Gemini, visual interface, Aether",
-  authors: [{ name: "Aether AI Team" }],
+  authors: [{ name: "Sri Ujjwal Reddy" }],
   openGraph: {
-    title: "Aether AI - Visual AI Conversations",
-    description: "Transform your AI conversations into explorable trees of thought with Aether AI",
+    title: "Aether AI- Chat Multiverse",
+    description: "Transform your AI conversations into explorable trees of thought with Aether",
     type: "website",
-    images: ["/vercel.svg"], // Using placeholder for now
+    images: ["/aether.svg"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Aether AI - Visual AI Conversations",
+    title: "Aether AI- Chat Multiverse",
     description: "Transform your AI conversations into explorable trees of thought with Aether AI",
-    images: ["/vercel.svg"], // Using placeholder for now
+    images: ["/aether.svg"],
   },
   icons: {
-    icon: "/vercel.svg", // Using placeholder for now
-    shortcut: "/vercel.svg",
-    apple: "/vercel.svg",
+    icon: "/aether.svg",
+    shortcut: "/aether.svg",
+    apple: "/aether.svg",
   },
 };
 
@@ -44,8 +40,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet" />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
+        className={`${spaceGrotesk.variable} antialiased min-h-screen font-space-grotesk`}
       >
         {children}
       </body>

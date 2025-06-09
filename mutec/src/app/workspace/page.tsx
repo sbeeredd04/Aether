@@ -5,9 +5,10 @@ import ChatCanvas from '@/components/ChatCanvas';
 import NodeSidebar from '@/components/NodeSidebar';
 import PromptBar from '@/components/PromptBar';
 import { useChatStore } from '@/store/chatStore';
-import { FiSettings } from 'react-icons/fi';
+import { FiSettings, FiHome } from 'react-icons/fi';
 import { FaInfo } from 'react-icons/fa';
 import { BsLayoutSidebarInsetReverse } from "react-icons/bs";
+import Link from 'next/link';
 import SettingsPanel from '@/components/SettingsPanel';
 import VoiceInputModal from '@/components/VoiceInputModal';
 import ImageModal from '@/components/ImageModal';
@@ -15,7 +16,7 @@ import ModelInfoModal from '@/components/ModelInfoModal';
 
 export default function WorkspacePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(384); // Default width (96 * 4 = 384px)
+  const [sidebarWidth, setSidebarWidth] = useState(500); // Increased default width
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showModelInfo, setShowModelInfo] = useState(false);
@@ -150,6 +151,13 @@ export default function WorkspacePage() {
     <main className="bg-[#000000] h-screen flex flex-col relative overflow-hidden">
       {/* Top control bar */}
       <div className="absolute top-4 left-4 flex gap-3 z-50">
+        <Link
+          href="/"
+          className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md"
+          aria-label="Home"
+        >
+          <FiHome size={22} />
+        </Link>
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}

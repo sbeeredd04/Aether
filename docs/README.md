@@ -1,6 +1,20 @@
-# Aether AI Documentation
+# Aether AI - Chat Multiverse Documentation
 
-Welcome to the Aether AI documentation. This directory contains comprehensive guides and technical documentation for the project.
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+
+<div align="center">
+  <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px;">
+    <img src="../aether/public/aether.svg" alt="Aether AI Logo" width="50" height="50" />
+    <h1 style="font-family: 'Major Mono Display', monospace; font-size: 32px; margin: 0; color: #333;">Aether</h1>
+  </div>
+</div>
+
+Welcome to the <span style="font-family: 'Major Mono Display', monospace;">Aether</span> AI - Chat Multiverse documentation. This directory contains comprehensive guides and technical documentation for the revolutionary visual conversation interface.
+
+**LIVE DEMO**: [aether.sriujjwalreddy.com](https://aether.sriujjwalreddy.com)  
+**DEVELOPER**: [Sri Ujjwal Reddy](https://github.com/sbeeredd04) | [Portfolio](https://sriujjwalreddy.com)
 
 ## Documentation Index
 

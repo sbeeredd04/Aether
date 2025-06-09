@@ -1,16 +1,25 @@
-# Aether AI - Visual Conversation Trees
+# Aether AI - Chat Multiverse
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
 
 <div align="center">
-  <img src="./assets/logo.png" alt="Aether AI Logo" width="120" height="120" />
+  <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 20px;">
+    <img src="./aether/public/aether.svg" alt="Aether AI Logo" width="80" height="80" />
+    <h1 style="font-family: 'Major Mono Display', monospace; font-size: 48px; margin: 0; color: #333;">Aether</h1>
+  </div>
   
   [![GitHub stars](https://img.shields.io/github/stars/sbeeredd04/Aether?style=for-the-badge)](https://github.com/sbeeredd04/Aether/stargazers)
   [![GitHub license](https://img.shields.io/github/license/sbeeredd04/Aether?style=for-the-badge)](https://github.com/sbeeredd04/Aether/blob/main/LICENSE)
   [![GitHub issues](https://img.shields.io/github/issues/sbeeredd04/Aether?style=for-the-badge)](https://github.com/sbeeredd04/Aether/issues)
   [![GitHub contributors](https://img.shields.io/github/contributors/sbeeredd04/Aether?style=for-the-badge)](https://github.com/sbeeredd04/Aether/graphs/contributors)
 
-  **Transform your AI conversations into explorable trees of thought**
+  **Transform your AI conversations into explorable trees of thought with the Chat Multiverse**
   
-  [Try Demo](https://aether-ai.vercel.app) • [Documentation](./docs/README.md) • [Report Bug](https://github.com/sbeeredd04/Aether/issues) • [Feature Request](https://github.com/sbeeredd04/Aether/issues)
+  [**LIVE DEMO**](https://aether.sriujjwalreddy.com) • [**DOCUMENTATION**](./docs/README.md) • [**REPORT BUG**](https://github.com/sbeeredd04/Aether/issues) • [**FEATURE REQUEST**](https://github.com/sbeeredd04/Aether/issues)
+  
+  **Developed by [Sri Ujjwal Reddy](https://github.com/sbeeredd04) | [Portfolio](https://sriujjwalreddy.com)**
 </div>
 
 ---
@@ -31,12 +40,13 @@
 
 ## About
 
-Aether AI revolutionizes how you interact with artificial intelligence by transforming linear conversations into visual, explorable trees. Instead of losing context in long chat threads, you can:
+Aether AI - Chat Multiverse revolutionizes how you interact with artificial intelligence by transforming linear conversations into visual, explorable trees. Enter a multiverse where every conversation branches into infinite possibilities. Instead of losing context in long chat threads, you can:
 
 - **Branch conversations** from any point to explore different ideas
-- **Navigate visually** through your conversation history
+- **Navigate visually** through your conversation history across the multiverse
 - **Compare responses** from multiple AI models side-by-side
 - **Never lose context** with persistent conversation trees
+- **Experience modern design** with Major Mono Display typography and glass morphism UI
 
 ![Aether AI Demo](./assets/demo.gif)
 
@@ -63,10 +73,16 @@ Create unlimited conversation branches from any point. Explore different answers
 Get answers backed by real-time web search. Perfect for research, fact-checking, and current events.
 
 ### Developer Friendly
-- Full markdown support
-- Code syntax highlighting
-- Copy functionality
-- Session persistence
+- Full markdown support with syntax highlighting
+- One-click copy functionality for code blocks
+- Automatic session persistence
+- Modern typography with Major Mono Display and Space Grotesk
+
+### Modern Design System
+- **Typography**: Major Mono Display for headings, Space Grotesk for readability
+- **Theme**: Dark mode with purple/blue gradient accents
+- **UI**: Glass morphism effects with backdrop blur
+- **Logo**: Custom metallic gradient SVG design
 
 ## Quick Start
 
@@ -183,19 +199,19 @@ See our [Development Guide](./docs/DEVELOPMENT.md) for detailed information.
 ## Roadmap
 
 ### Current Version (v0.1.0)
-- ✅ Visual conversation trees
-- ✅ Multiple AI models
-- ✅ Web-grounded responses
-- ✅ Image generation
-- ✅ Rich markdown support
+- **COMPLETED** Visual conversation trees
+- **COMPLETED** Multiple AI models
+- **COMPLETED** Web-grounded responses
+- **COMPLETED** Image generation
+- **COMPLETED** Rich markdown support
 
 ### Upcoming Features
-- [ ] Real-time collaboration
-- [ ] Voice conversations
-- [ ] Mobile app
-- [ ] Plugin system
-- [ ] Advanced export options
-- [ ] Team workspaces
+- **PLANNED** Real-time collaboration
+- **PLANNED** Voice conversations
+- **PLANNED** Mobile app
+- **PLANNED** Plugin system
+- **PLANNED** Advanced export options
+- **PLANNED** Team workspaces
 
 See our [detailed roadmap](./docs/ROADMAP.md) for more information.
 
@@ -223,7 +239,7 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 ---
 
 <div align="center">
-  Made with ❤️ by the Aether AI team
+  <p style="font-family: 'Space Grotesk', sans-serif;">Made with <span style="color: #e74c3c;">♥</span> by the <span style="font-family: 'Major Mono Display', monospace;">Aether</span> AI team</p>
   
-  [Website](https://aether-ai.vercel.app) • [GitHub](https://github.com/sbeeredd04/Aether)
+  [Website](https://aether.sriujjwalreddy.com) • [GitHub](https://github.com/sbeeredd04/Aether)
 </div>

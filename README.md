@@ -16,6 +16,7 @@ Mutec allows users to create branching conversations from any point in a chat hi
 - **Conversation History**: View complete history of any conversation path
 - **Resizable Sidebar**: Adjust the UI to your preference
 - **Node Management**: Reset or delete conversation nodes
+- **Markdown Support**: Rich text formatting with full markdown support including code blocks, tables, and syntax highlighting
 
 ## Getting Started
 
@@ -30,6 +31,7 @@ Mutec allows users to create branching conversations from any point in a chat hi
 - **Visualization**: React Flow
 - **Styling**: Tailwind CSS
 - **AI Integration**: Gemini API (with plans to add more models)
+- **Markdown**: React Markdown with syntax highlighting and advanced formatting
 
 ## Developer Roadmap
 
@@ -40,17 +42,20 @@ Mutec allows users to create branching conversations from any point in a chat hi
 - [✓] Improve node titles to better reflect conversation content
 - [✓] Update sidebar UI to display conversation context more clearly
 - [✓] Add model badges to nodes to show which AI model answered the question
-- [ ] Implement markdown rendering for model outputs
+- [✓] Implement markdown rendering for model outputs
 - [ ] Multiple models and their support 
-    - [ ] Add multiple models and their support placeholders to the prompt bar
-    - [ ] document support / File upload
-    - [ ] grounding with google search
-    - [ ] add image generation and video generation and speech geneeration as well
-    - [ ] video and sccreen sharing understanding and support / Live API
+    - [✓] Add multiple models and their support placeholders to the prompt bar
+    - [ ] document support / File upload (Using files api for larger files)
+    - [✓] grounding with google search
+    - [✓] add image generation
+    - [ ] video and sccreen sharing understanding and support / Live API (Websocket)
+- [ ] Add color consistency in the UI and better UX
+- [ ] New Branch Redirection
+- [ ] Auto canvas restructuring
 
 
 ### Future Enhancements
-
+- [ ] Thread naming ?
 - [ ] User authentication and profiles
 - [ ] Shareable conversation graphs
 - [ ] Export conversations to different formats

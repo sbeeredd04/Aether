@@ -717,12 +717,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Save to session after creating node and edge
     get().saveToSession();
-    
-    // Automatically set the new node as active for branch redirection
-    const { setActiveNodeId } = get();
-    setActiveNodeId(newNodeId);
-    
-    logger.info('ChatStore: New node set as active', { newNodeId });
 
     return newNodeId;
   },

@@ -407,7 +407,7 @@ export default function PromptBar({
       });
 
       // Get API settings
-      const savedSettings = localStorage.getItem('mutec-settings');
+      const savedSettings = localStorage.getItem('aether-settings');
       if (!savedSettings) {
         logger.error('PromptBar: No saved settings found in localStorage');
         throw new Error('API key not found.');

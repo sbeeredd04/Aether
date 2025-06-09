@@ -47,7 +47,7 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
 
   // Initialize chat manager when component mounts
   useEffect(() => {
-    const savedSettings = localStorage.getItem('mutec-settings');
+    const savedSettings = localStorage.getItem('aether-settings');
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
       if (settings.apiKey) {
@@ -94,11 +94,12 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
 
   const handleBranch = useCallback(() => {
     const newNodeId = createNodeAndEdge(id, 'New Chat', 'branch');
-    logger.info('CustomChatNode: Branch created', { 
+    setActiveNodeId(newNodeId); // Set the new branch as active
+    logger.info('CustomChatNode: Branch created and set as active', { 
       sourceNodeId: id, 
       newNodeId 
     });
-  }, [id, createNodeAndEdge]);
+  }, [id, createNodeAndEdge, setActiveNodeId]);
 
   const handleReset = useCallback(() => {
     resetNode(id);

@@ -11,7 +11,7 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-const SETTINGS_KEY = 'mutec-settings';
+const SETTINGS_KEY = 'aether-settings';
 
 export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [apiKey, setApiKey] = useState('');

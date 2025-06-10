@@ -22,6 +22,7 @@ interface NodeSidebarProps {
   width?: number;
   isActiveNodeLoading?: boolean;
   onImageClick?: (imageSrc: string, imageTitle: string) => void;
+  isMobile?: boolean;
 }
 
 export default function NodeSidebar({
@@ -35,7 +36,8 @@ export default function NodeSidebar({
   onBranch,
   width = 384,
   isActiveNodeLoading = false,
-  onImageClick
+  onImageClick,
+  isMobile = false
 }: NodeSidebarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { getPathToNode, nodes, edges } = useChatStore();
@@ -50,7 +52,8 @@ export default function NodeSidebar({
     hasData: !!data,
     threadMessagesCount: threadMessages.length,
     isActiveNodeLoading,
-    width
+    width,
+    isMobile
   });
   
   function getFullConversationThread(targetNodeId: string): ChatMessage[] {
@@ -178,12 +181,14 @@ export default function NodeSidebar({
 
   return (
     <div 
-      className="h-full flex flex-col bg-black/40 rounded-xl border border-white/10 shadow-xl sidebar-space-grotesk" 
+      className={`h-full flex flex-col ${isMobile ? 'bg-black/60' : 'bg-black/40'} ${
+        isMobile ? 'rounded-none' : 'rounded-xl'
+      } border border-white/10 shadow-xl sidebar-space-grotesk`} 
       style={{ width }}
     >
-      <div className="p-4 border-b border-white/10 flex-shrink-0">
+      <div className={`${isMobile ? 'p-3' : 'p-4'} border-b border-white/10 flex-shrink-0`}>
         <div className="flex items-center justify-between mb-1">
-          <h2 className="font-semibold text-lg text-white truncate group relative font-space-grotesk">
+          <h2 className={`font-semibold ${isMobile ? 'text-base' : 'text-lg'} text-white truncate group relative font-space-grotesk`}>
             {data?.label || 'New Chat'}
             {/* Tooltip for long titles */}
             {data?.label && data.label.length > 30 && (
@@ -192,35 +197,45 @@ export default function NodeSidebar({
               </div>
             )}
           </h2>
-          <button onClick={onClose} className="hover:text-white text-gray-300 transition-colors" title="Close">
-            <FiX size={20} />
-          </button>
+          {!isMobile && (
+            <button onClick={onClose} className="hover:text-white text-gray-300 transition-colors" title="Close">
+              <FiX size={20} />
+            </button>
+          )}
         </div>
         {data?.chatHistory.length > 0 && (
-          <div className="text-sm text-white/50 font-space-grotesk">
+          <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white/50 font-space-grotesk`}>
             {data.chatHistory.length} messages in this conversation
           </div>
         )}
       </div>
-      <div className="flex gap-3 px-4 py-2 border-b border-white/10 bg-black/20">
+      <div className={`flex gap-2 ${isMobile ? 'px-3 py-2' : 'px-4 py-2'} border-b border-white/10 bg-black/20 ${
+        isMobile ? 'flex-wrap' : 'gap-3'
+      }`}>
         {hasResponse && (
-          <button onClick={onBranch} className="text-purple-300 hover:text-purple-200 flex items-center gap-1 font-space-grotesk" title="Branch Chat">
-            <FiPlus size={16} /> Branch
+          <button onClick={onBranch} className={`text-purple-300 hover:text-purple-200 flex items-center gap-1 font-space-grotesk ${
+            isMobile ? 'text-xs px-2 py-1 bg-purple-900/20 rounded' : ''
+          }`} title="Branch Chat">
+            <FiPlus size={isMobile ? 14 : 16} /> Branch
           </button>
         )}
-        <button onClick={onReset} className="text-blue-300 hover:text-blue-200 flex items-center gap-1 font-space-grotesk" title="Reset Node">
-          <FiRefreshCw size={16} /> Reset
+        <button onClick={onReset} className={`text-blue-300 hover:text-blue-200 flex items-center gap-1 font-space-grotesk ${
+          isMobile ? 'text-xs px-2 py-1 bg-blue-900/20 rounded' : ''
+        }`} title="Reset Node">
+          <FiRefreshCw size={isMobile ? 14 : 16} /> Reset
         </button>
         {!isRootNode && (
-          <button onClick={onDelete} className="text-red-300 hover:text-red-200 flex items-center gap-1 font-space-grotesk" title="Delete Node">
-            <FiTrash2 size={16} /> Delete
+          <button onClick={onDelete} className={`text-red-300 hover:text-red-200 flex items-center gap-1 font-space-grotesk ${
+            isMobile ? 'text-xs px-2 py-1 bg-red-900/20 rounded' : ''
+          }`} title="Delete Node">
+            <FiTrash2 size={isMobile ? 14 : 16} /> Delete
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto px-4 scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent" style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}>
+      <div className={`flex-1 overflow-y-auto ${isMobile ? 'px-3' : 'px-4'} scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent`} style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}>
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent"
+          className={`flex-1 overflow-y-auto ${isMobile ? 'px-2 py-4' : 'px-4 py-6'} space-y-3 scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent`}
           style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}
         >
           {threadMessages.length > 0 ? (
@@ -237,30 +252,32 @@ export default function NodeSidebar({
                   className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}
                 >
                   <div
-                    className={`relative max-w-[80%] px-4 py-3 rounded-2xl shadow-md text-base font-normal transition-all backdrop-blur-sm
+                    className={`relative ${isMobile ? 'max-w-[90%]' : 'max-w-[80%]'} ${
+                      isMobile ? 'px-3 py-2' : 'px-4 py-3'
+                    } rounded-2xl shadow-md ${isMobile ? 'text-sm' : 'text-base'} font-normal transition-all backdrop-blur-sm
                       ${isUser
                         ? 'bg-purple-600/20 text-white border border-purple-400/30 ml-auto'
                         : 'bg-white/5 text-white border border-white/10 mr-auto'}
                       ${contentHasMarkdown ? 'markdown-message' : ''}
                     `}
-                    style={{ minWidth: 60 }}
+                    style={{ minWidth: isMobile ? 40 : 60 }}
                   >
                     {isModel && isGeminiModel((msg as any).modelId) && (
-                      <div className="absolute -top-5 -left-5 flex items-center" title={getModelName((msg as any).modelId)}>
+                      <div className={`absolute ${isMobile ? '-top-4 -left-4' : '-top-5 -left-5'} flex items-center`} title={getModelName((msg as any).modelId)}>
                         <span className="group-hover:scale-110 transition-transform cursor-pointer">
-                          <SiGooglegemini size={22} className="text-blue-300 drop-shadow-md" />
+                          <SiGooglegemini size={isMobile ? 18 : 22} className="text-blue-300 drop-shadow-md" />
                         </span>
                       </div>
                     )}
                     <div className="flex items-center justify-between mb-1">
-                      <div className="text-xs font-semibold text-gray-300/80 font-space-grotesk">
+                      <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-gray-300/80 font-space-grotesk`}>
                         {isUser ? 'You' : getModelName((msg as any).modelId)}
                       </div>
                       {/* Copy button for model responses */}
                       {isModel && (
                         <CopyButton 
                           content={parsedContent?.hasThoughts ? parsedContent.answer || msg.content : msg.content} 
-                          size={12} 
+                          size={isMobile ? 10 : 12} 
                           className="opacity-60 hover:opacity-100"
                         />
                       )}
@@ -274,7 +291,7 @@ export default function NodeSidebar({
                               <img 
                                 src={att.previewUrl || `data:${att.type};base64,${att.data}`} 
                                 alt={att.name} 
-                                className="max-w-[150px] max-h-[150px] rounded cursor-pointer hover:scale-105 transition-transform" 
+                                className={`${isMobile ? 'max-w-[120px] max-h-[120px]' : 'max-w-[150px] max-h-[150px]'} rounded cursor-pointer hover:scale-105 transition-transform`} 
                                 onClick={() => onImageClick && onImageClick(
                                   att.previewUrl || `data:${att.type};base64,${att.data}`,
                                   att.name
@@ -285,12 +302,12 @@ export default function NodeSidebar({
                                 audioSrc={att.previewUrl || `data:${att.type};base64,${att.data}`}
                                 fileName={att.name}
                                 mimeType={att.type}
-                                className="w-full max-w-[250px]"
+                                className={`w-full ${isMobile ? 'max-w-[200px]' : 'max-w-[250px]'}`}
                               />
                             ) : (
                               <div className="flex items-center gap-2 text-white p-2 w-full max-w-[200px]">
                                 <FiFileText />
-                                <span className="text-sm truncate">{att.name}</span>
+                                <span className={`${isMobile ? 'text-xs' : 'text-sm'} truncate`}>{att.name}</span>
                               </div>
                             )}
                           </div>
@@ -303,15 +320,15 @@ export default function NodeSidebar({
                       <div className="mb-2">
                         <button
                           onClick={() => toggleThoughts(idx)}
-                          className="flex items-center gap-2 text-xs text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk"
+                          className={`flex items-center gap-2 ${isMobile ? 'text-xs' : 'text-xs'} text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk`}
                         >
-                          {isThoughtsExpanded ? <FiChevronDown size={14} /> : <FiChevronRight size={14} />}
+                          {isThoughtsExpanded ? <FiChevronDown size={isMobile ? 12 : 14} /> : <FiChevronRight size={isMobile ? 12 : 14} />}
                           {isThoughtsExpanded ? 'Hide' : 'Show'} Thoughts
                         </button>
                         {isThoughtsExpanded && (
-                          <div className="mt-2 p-3 bg-black/20 rounded-lg border border-blue-500/20">
-                            <div className="text-xs font-semibold text-blue-300 mb-2 font-space-grotesk">Thoughts:</div>
-                            <div className="text-sm text-white/80 font-space-grotesk">
+                          <div className={`mt-2 ${isMobile ? 'p-2' : 'p-3'} bg-black/20 rounded-lg border border-blue-500/20`}>
+                            <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-blue-300 mb-2 font-space-grotesk`}>Thoughts:</div>
+                            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white/80 font-space-grotesk`}>
                               {hasMarkdown(parsedContent.thoughts) ? (
                                 <div className="markdown-content font-space-grotesk">
                                   <MarkdownRenderer content={parsedContent.thoughts} />
@@ -348,12 +365,12 @@ export default function NodeSidebar({
 
                     {/* Citations and search suggestions for model responses */}
                     {isModel && (msg as any).groundingMetadata && (
-                      <div className="mt-3 pt-3 border-t border-neutral-700/50">
+                      <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
                         <Citations
                           citations={(msg as any).groundingMetadata.citations}
                           searchQueries={(msg as any).groundingMetadata.webSearchQueries}
                           searchEntryPoint={(msg as any).groundingMetadata.searchEntryPoint?.renderedContent}
-                          className="text-sm"
+                          className={isMobile ? 'text-xs' : 'text-sm'}
                         />
                       </div>
                     )}
@@ -362,15 +379,17 @@ export default function NodeSidebar({
               );
             })
           ) : (
-            <div className="text-center text-gray-400 py-8 font-space-grotesk">No messages in this conversation yet</div>
+            <div className={`text-center text-gray-400 ${isMobile ? 'py-6' : 'py-8'} font-space-grotesk`}>No messages in this conversation yet</div>
           )}
           {/* Loading animation for current node */}
           {isActiveNodeLoading && (
             <div className="flex justify-start">
-              <div className="max-w-[80%] px-4 py-3 rounded-2xl shadow-md bg-white/5 backdrop-blur-sm border border-white/10 flex items-center gap-2">
+              <div className={`${isMobile ? 'max-w-[90%]' : 'max-w-[80%]'} ${
+                isMobile ? 'px-3 py-2' : 'px-4 py-3'
+              } rounded-2xl shadow-md bg-white/5 backdrop-blur-sm border border-white/10 flex items-center gap-2`}>
                 <div className="relative">
-                  <span className="absolute -top-5 -left-5">
-                    <SiGooglegemini size={22} className="text-blue-300 drop-shadow-md" title={getModelName()} />
+                  <span className={`absolute ${isMobile ? '-top-4 -left-4' : '-top-5 -left-5'}`}>
+                    <SiGooglegemini size={isMobile ? 18 : 22} className="text-blue-300 drop-shadow-md" title={getModelName()} />
                   </span>
                 </div>
                 <LoadingDots />
@@ -378,7 +397,7 @@ export default function NodeSidebar({
             </div>
           )}
           {/* Bottom margin for conversation */}
-          <div className="h-8"></div>
+          <div className={isMobile ? 'h-6' : 'h-8'}></div>
         </div>
       </div>
     </div>

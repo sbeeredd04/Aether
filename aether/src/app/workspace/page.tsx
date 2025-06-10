@@ -5,9 +5,10 @@ import ChatCanvas from '@/components/ChatCanvas';
 import NodeSidebar from '@/components/NodeSidebar';
 import PromptBar from '@/components/PromptBar';
 import { useChatStore } from '@/store/chatStore';
-import { FiSettings, FiHome } from 'react-icons/fi';
+import { FiSettings, FiHome, FiMenu, FiX } from 'react-icons/fi';
 import { FaInfo, FaGithub, FaExternalLinkAlt } from 'react-icons/fa';
 import { BsLayoutSidebarInsetReverse } from "react-icons/bs";
+import { BiMessageSquareDetail, BiNetworkChart } from "react-icons/bi";
 import Link from 'next/link';
 import Image from 'next/image';
 import SettingsPanel from '@/components/SettingsPanel';
@@ -17,10 +18,12 @@ import ModelInfoModal from '@/components/ModelInfoModal';
 
 export default function WorkspacePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(600); // Increased default width for better readability
+  const [sidebarWidth, setSidebarWidth] = useState(600);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showModelInfo, setShowModelInfo] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'canvas' | 'chat'>('canvas');
   
   // Modal states
   const [showVoiceModal, setShowVoiceModal] = useState(false);
@@ -42,36 +45,53 @@ export default function WorkspacePage() {
   const activeNode = nodes.find(n => n.id === activeNodeId);
   const isRootNode = activeNodeId === 'root';
   
-  // Open sidebar when an active node is selected
+  // Check if mobile
+  const [isMobile, setIsMobile] = useState(false);
+  
   useEffect(() => {
-    if (activeNodeId) {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Auto-switch to chat tab when a node is selected on mobile
+  useEffect(() => {
+    if (activeNodeId && isMobile) {
+      setActiveTab('chat');
+    }
+  }, [activeNodeId, isMobile]);
+
+  // Open sidebar when an active node is selected (desktop only)
+  useEffect(() => {
+    if (activeNodeId && !isMobile) {
       setIsSidebarOpen(true);
     }
-  }, [activeNodeId]);
+  }, [activeNodeId, isMobile]);
 
   // Load session on mount
   useEffect(() => {
-    // Load previous session if available
     const sessionLoaded = loadFromSession();
     if (sessionLoaded) {
       console.log('Session restored successfully');
     }
   }, [loadFromSession]);
 
-  // Handle resize events
+  // Handle resize events for desktop sidebar
   useEffect(() => {
-    if (!isSidebarOpen) return;
+    if (!isSidebarOpen || isMobile) return;
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!resizingRef.current) return;
       
       const newWidth = startWidthRef.current - (e.clientX - startXRef.current);
-      // Limit sidebar width between 250px and 50% of screen width
       const maxWidth = window.innerWidth * 0.5;
       const limitedWidth = Math.max(250, Math.min(newWidth, maxWidth));
       
       setSidebarWidth(limitedWidth);
-      console.log('Resizing sidebar to:', limitedWidth);
     };
 
     const handleMouseUp = () => {
@@ -87,10 +107,9 @@ export default function WorkspacePage() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isSidebarOpen]);
+  }, [isSidebarOpen, isMobile]);
 
   const startResize = (e: React.MouseEvent) => {
-    console.log('Start resizing');
     resizingRef.current = true;
     startXRef.current = e.clientX;
     startWidthRef.current = sidebarWidth;
@@ -123,17 +142,12 @@ export default function WorkspacePage() {
     }
   };
 
-  // Modal handlers
   const handleVoiceInput = (transcript: string) => {
-    console.log('Voice input received:', transcript);
-    // Pass the transcript to the PromptBar through a ref or callback
-    // For now, we'll store it in a state that PromptBar can access
     setVoiceTranscript(transcript);
   };
 
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
 
-  // Reset voice transcript after it's used
   const clearVoiceTranscript = () => {
     setVoiceTranscript('');
   };
@@ -148,170 +162,265 @@ export default function WorkspacePage() {
     setSelectedImage(null);
   };
 
+  // Mobile menu items
+  const mobileMenuItems = [
+    { icon: <FiHome size={20} />, label: 'Home', href: '/' },
+    { icon: <FaInfo size={20} />, label: 'Model Info', action: () => setShowModelInfo(true) },
+    { icon: <FiSettings size={20} />, label: 'Settings', action: () => setSettingsOpen(true) },
+    { icon: <FaGithub size={20} />, label: 'GitHub', href: 'https://github.com/sbeeredd04/Aether', external: true },
+  ];
+
   return (
     <main className="bg-[#000000] h-screen flex flex-col relative overflow-hidden">
-      {/* Top control bar */}
-      <div className="absolute top-4 left-4 flex gap-3 z-50 items-center">
-        {/* Aether Logo */}
-        <div className="flex items-center gap-3 bg-black/30 backdrop-blur-sm px-3 py-2 rounded-md">
-          <Image
-            src="/aether.svg"
-            alt="Aether AI"
-            width={40}
-            height={40}
-            className="text-white"
-          />
-          <span className="text-white font-major-mono text-3xl font-normal">Aether</span>
-        </div>
-        
-        <Link
-          href="/"
-          className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md"
-          aria-label="Home"
-        >
-          <FiHome size={22} />
-        </Link>
-        {!isSidebarOpen && (
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md"
-            aria-label="Open Sidebar"
-          >
-            <BsLayoutSidebarInsetReverse size={22} />
-          </button>
-        )}
-        <button 
-          onClick={() => setShowModelInfo(true)}
-          className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md"
-          aria-label="Model Information"
-        >
-          <FaInfo size={22} />
-        </button>
-        <button 
-          onClick={() => setSettingsOpen(true)}
-          className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md"
-          aria-label="Open Settings"
-        >
-          <FiSettings size={22} />
-        </button>
-      </div>
-
-      {/* Main content area */}
-      <div className="flex flex-1 h-full">
-        {/* Canvas area */}
-        <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'pr-[10px]' : ''}`}>
-          <ChatCanvas disableInteractions={showVoiceModal || showImageModal || showModelInfo || isSettingsOpen} />
-        </div>
-        
-        {/* Sidebar area */}
-        {isSidebarOpen && (
-          <div className="relative h-full flex">
-            {/* Resize handle */}
-            <div 
-              className="w-[10px] h-full cursor-ew-resize hover:bg-purple-500/50 z-50 bg-white/10"
-              onMouseDown={startResize}
-            />
-            
-            {/* Sidebar content */}
-            <div 
-              className="bg-black/30 backdrop-blur-sm border-l border-white/10 shadow-xl z-40 h-full"
-              style={{ width: `${sidebarWidth}px` }}
-            >
-              <NodeSidebar
-                isOpen={true}
-                onClose={handleCloseSidebar}
-                data={activeNode?.data || null}
-                nodeId={activeNodeId}
-                isRootNode={isRootNode}
-                onReset={handleReset}
-                onDelete={handleDelete}
-                onBranch={handleBranch}
-                width={sidebarWidth}
-                isActiveNodeLoading={isLoading}
-                onImageClick={handleImageClick}
-              />
+      {/* Desktop Layout */}
+      {!isMobile && (
+        <>
+          {/* Desktop Top Control Bar */}
+          <div className="absolute top-4 left-4 flex gap-3 z-50 items-center">
+            <div className="flex items-center gap-3 bg-black/30 backdrop-blur-sm px-3 py-2 rounded-md">
+              <Image src="/aether.svg" alt="Aether AI" width={40} height={40} />
+              <span className="text-white font-major-mono text-3xl font-normal">Aether</span>
             </div>
+            
+            <Link href="/" className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md">
+              <FiHome size={22} />
+            </Link>
+            {!isSidebarOpen && (
+              <button onClick={() => setIsSidebarOpen(true)} className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md">
+                <BsLayoutSidebarInsetReverse size={22} />
+              </button>
+            )}
+            <button onClick={() => setShowModelInfo(true)} className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md">
+              <FaInfo size={22} />
+            </button>
+            <button onClick={() => setSettingsOpen(true)} className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md">
+              <FiSettings size={22} />
+            </button>
           </div>
-        )}
-      </div>
-      
-      {/* PromptBar centered in visible canvas area, offset for sidebar */}
-      <div
-        className="absolute left-0 bottom-0 w-full flex justify-center items-end pointer-events-none mb-6"
-        style={{
-          paddingRight: isSidebarOpen ? sidebarWidth + 10 : 0,
-          transition: 'padding-right 0.2s',
-          zIndex: 60,
-        }}
-      >
-        <PromptBar 
-          node={activeNode} 
-          isLoading={isLoading} 
-          setIsLoading={setIsLoading}
-          onShowVoiceModal={() => setShowVoiceModal(true)}
-          onShowImageModal={handleImageClick}
-          voiceTranscript={voiceTranscript}
-          onClearVoiceTranscript={clearVoiceTranscript}
-        />
-      </div>
 
-      {/* Footer */}
-      <div className="absolute bottom-4 right-4 z-40">
-        <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-lg px-4 py-2">
-          <div className="flex items-center gap-3 text-sm text-white/70">
-            <span className="font-space-grotesk">Developed by</span>
-            <div className="flex items-center gap-2">
-              <span className="font-space-grotesk font-medium text-white/90">Sri Ujjwal Reddy</span>
-              <div className="flex items-center gap-2">
-                <a
-                  href="https://github.com/sbeeredd04"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white/60 hover:text-white transition-colors"
-                  aria-label="GitHub Profile"
-                >
-                  <FaGithub size={16} />
-                </a>
-                <a
-                  href="https://sriujjwalreddy.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white/60 hover:text-white transition-colors"
-                  aria-label="Portfolio Website"
-                >
-                  <FaExternalLinkAlt size={14} />
-                </a>
+          {/* Desktop Main Content */}
+          <div className="flex flex-1 h-full">
+            <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'pr-[10px]' : ''}`}>
+              <ChatCanvas disableInteractions={showVoiceModal || showImageModal || showModelInfo || isSettingsOpen} isMobile={false} />
+            </div>
+            
+            {isSidebarOpen && (
+              <div className="relative h-full flex">
+                <div className="w-[10px] h-full cursor-ew-resize hover:bg-purple-500/50 z-50 bg-white/10" onMouseDown={startResize} />
+                <div className="bg-black/30 backdrop-blur-sm border-l border-white/10 shadow-xl z-40 h-full" style={{ width: `${sidebarWidth}px` }}>
+                  <NodeSidebar
+                    isOpen={true}
+                    onClose={handleCloseSidebar}
+                    data={activeNode?.data || null}
+                    nodeId={activeNodeId}
+                    isRootNode={isRootNode}
+                    onReset={handleReset}
+                    onDelete={handleDelete}
+                    onBranch={handleBranch}
+                    width={sidebarWidth}
+                    isActiveNodeLoading={isLoading}
+                    onImageClick={handleImageClick}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Desktop PromptBar */}
+          <div
+            className="absolute left-0 bottom-0 w-full flex justify-center items-end pointer-events-none mb-6"
+            style={{
+              paddingRight: isSidebarOpen ? sidebarWidth + 10 : 0,
+              transition: 'padding-right 0.2s',
+              zIndex: 60,
+            }}
+          >
+            <PromptBar 
+              node={activeNode} 
+              isLoading={isLoading} 
+              setIsLoading={setIsLoading}
+              onShowVoiceModal={() => setShowVoiceModal(true)}
+              onShowImageModal={handleImageClick}
+              voiceTranscript={voiceTranscript}
+              onClearVoiceTranscript={clearVoiceTranscript}
+            />
+          </div>
+
+          {/* Desktop Footer */}
+          <div className="absolute bottom-4 right-4 z-40">
+            <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-lg px-4 py-2">
+              <div className="flex items-center gap-3 text-sm text-white/70">
+                <span className="font-space-grotesk">Developed by</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-space-grotesk font-medium text-white/90">Sri Ujjwal Reddy</span>
+                  <div className="flex items-center gap-2">
+                    <a href="https://github.com/sbeeredd04" target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-white transition-colors">
+                      <FaGithub size={16} />
+                    </a>
+                    <a href="https://sriujjwalreddy.com" target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-white transition-colors">
+                      <FaExternalLinkAlt size={14} />
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      
-      {/* Settings panel */}
-      <SettingsPanel isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
-
-      {/* Voice Input Modal */}
-      <VoiceInputModal
-        isOpen={showVoiceModal}
-        onClose={() => setShowVoiceModal(false)}
-        onTranscriptComplete={handleVoiceInput}
-      />
-
-      {/* Image Modal */}
-      {selectedImage && (
-        <ImageModal
-          isOpen={showImageModal}
-          onClose={handleCloseImageModal}
-          imageSrc={selectedImage.src}
-          imageTitle={selectedImage.title}
-        />
+        </>
       )}
 
-      {/* Model Info Modal */}
-      <ModelInfoModal
-        isOpen={showModelInfo}
-        onClose={() => setShowModelInfo(false)}
-      />
+      {/* Mobile Layout */}
+      {isMobile && (
+        <div className="flex flex-col h-full">
+          {/* Mobile Header */}
+          <div className="flex items-center justify-between p-4 bg-black/40 backdrop-blur-sm border-b border-white/10 z-50">
+            <div className="flex items-center gap-2">
+              <Image src="/aether.svg" alt="Aether AI" width={24} height={24} />
+              <span className="text-white font-major-mono text-lg font-normal">Aether</span>
+            </div>
+            
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="text-white/80 hover:text-white transition-colors p-2"
+            >
+              {isMobileMenuOpen ? <FiX size={20} /> : <FiMenu size={20} />}
+            </button>
+          </div>
+
+          {/* Mobile Menu Overlay */}
+          {isMobileMenuOpen && (
+            <div className="absolute top-16 left-0 right-0 bg-black/90 backdrop-blur-md border-b border-white/10 z-40">
+              <div className="p-4 space-y-3">
+                {mobileMenuItems.map((item, index) => (
+                  <div key={index}>
+                    {item.href ? (
+                      item.external ? (
+                        <a
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 text-white/80 hover:text-white transition-colors py-2"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          {item.icon}
+                          <span className="text-sm">{item.label}</span>
+                        </a>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          className="flex items-center gap-3 text-white/80 hover:text-white transition-colors py-2"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          {item.icon}
+                          <span className="text-sm">{item.label}</span>
+                        </Link>
+                      )
+                    ) : (
+                      <button
+                        onClick={() => {
+                          item.action?.();
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="flex items-center gap-3 text-white/80 hover:text-white transition-colors py-2 w-full text-left"
+                      >
+                        {item.icon}
+                        <span className="text-sm">{item.label}</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mobile Tab Switcher */}
+          <div className="flex bg-black/40 backdrop-blur-sm border-b border-white/10">
+            <button
+              onClick={() => setActiveTab('canvas')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all ${
+                activeTab === 'canvas'
+                  ? 'text-purple-300 border-b-2 border-purple-400 bg-purple-900/20'
+                  : 'text-white/60 hover:text-white/80'
+              }`}
+            >
+              <BiNetworkChart size={18} />
+              Canvas
+            </button>
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all ${
+                activeTab === 'chat'
+                  ? 'text-purple-300 border-b-2 border-purple-400 bg-purple-900/20'
+                  : 'text-white/60 hover:text-white/80'
+              }`}
+            >
+              <BiMessageSquareDetail size={18} />
+              Chat
+            </button>
+          </div>
+
+          {/* Mobile Content Area */}
+          <div className="flex-1 relative overflow-hidden">
+            {/* Canvas View */}
+            <div className={`absolute inset-0 transition-transform duration-300 ${
+              activeTab === 'canvas' ? 'translate-x-0' : '-translate-x-full'
+            }`}>
+              <ChatCanvas disableInteractions={showVoiceModal || showImageModal || showModelInfo || isSettingsOpen} isMobile={true} />
+            </div>
+            
+            {/* Chat View */}
+            <div className={`absolute inset-0 transition-transform duration-300 ${
+              activeTab === 'chat' ? 'translate-x-0' : 'translate-x-full'
+            }`}>
+              {activeNode ? (
+                <NodeSidebar
+                  isOpen={true}
+                  onClose={() => {}}
+                  data={activeNode.data}
+                  nodeId={activeNodeId}
+                  isRootNode={isRootNode}
+                  onReset={handleReset}
+                  onDelete={handleDelete}
+                  onBranch={handleBranch}
+                  width={window.innerWidth}
+                  isActiveNodeLoading={isLoading}
+                  onImageClick={handleImageClick}
+                  isMobile={true}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-white/60 text-center p-8">
+                  <div>
+                    <BiMessageSquareDetail size={48} className="mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium mb-2">No conversation selected</p>
+                    <p className="text-sm">Tap a node in the Canvas to start chatting</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile PromptBar */}
+          <div className="p-3 bg-black/40 backdrop-blur-sm border-t border-white/10">
+            <PromptBar 
+              node={activeNode} 
+              isLoading={isLoading} 
+              setIsLoading={setIsLoading}
+              onShowVoiceModal={() => setShowVoiceModal(true)}
+              onShowImageModal={handleImageClick}
+              voiceTranscript={voiceTranscript}
+              onClearVoiceTranscript={clearVoiceTranscript}
+              isMobile={true}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Modals */}
+      <SettingsPanel isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+      <VoiceInputModal isOpen={showVoiceModal} onClose={() => setShowVoiceModal(false)} onTranscriptComplete={handleVoiceInput} />
+      {selectedImage && (
+        <ImageModal isOpen={showImageModal} onClose={handleCloseImageModal} imageSrc={selectedImage.src} imageTitle={selectedImage.title} />
+      )}
+      <ModelInfoModal isOpen={showModelInfo} onClose={() => setShowModelInfo(false)} />
     </main>
   );
 } 

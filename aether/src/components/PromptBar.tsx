@@ -16,6 +16,7 @@ interface PromptBarProps {
   onShowImageModal?: (imageSrc: string, imageTitle: string) => void;
   voiceTranscript?: string;
   onClearVoiceTranscript?: () => void;
+  isMobile?: boolean;
 }
 
 interface Attachment {
@@ -40,7 +41,8 @@ export default function PromptBar({
   onShowVoiceModal, 
   onShowImageModal,
   voiceTranscript,
-  onClearVoiceTranscript 
+  onClearVoiceTranscript,
+  isMobile = false
 }: PromptBarProps) {
   // Early return check BEFORE any hooks
   if (!node) {
@@ -54,7 +56,7 @@ export default function PromptBar({
   const [enableThinking, setEnableThinking] = useState(true);
   const [ttsOptions, setTtsOptions] = useState<TTSOptions>({});
   const [grounding, setGrounding] = useState<GroundingOptions>({ enabled: false, dynamicThreshold: 0.3 });
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(true);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(!isMobile);
   const [isRecording, setIsRecording] = useState(false);
   
   // New modal states
@@ -607,8 +609,8 @@ export default function PromptBar({
     <div className="w-full flex justify-center items-end pointer-events-none">
       <div
         className={`
-          w-full max-w-3xl bg-neutral-900/80 backdrop-blur-md border border-white/10
-          rounded-2xl shadow-lg flex flex-col pointer-events-auto transition-colors
+          w-full ${isMobile ? 'max-w-full' : 'max-w-3xl'} bg-neutral-900/80 backdrop-blur-md border border-white/10
+          ${isMobile ? 'rounded-xl mx-2' : 'rounded-2xl'} shadow-lg flex flex-col pointer-events-auto transition-colors
           ${isDragOver ? 'ring-2 ring-purple-400/50 bg-purple-900/20' : ''}
         `}
         onDragOver={handleDragOver}
@@ -617,31 +619,33 @@ export default function PromptBar({
       >
         {/* Drag overlay */}
         {isDragOver && (
-          <div className="absolute inset-0 bg-purple-600/20 border-2 border-dashed border-purple-400 rounded-2xl 
-                          flex items-center justify-center z-10 pointer-events-none">
+          <div className={`absolute inset-0 bg-purple-600/20 border-2 border-dashed border-purple-400 ${
+            isMobile ? 'rounded-xl' : 'rounded-2xl'
+          } flex items-center justify-center z-10 pointer-events-none`}>
             <div className="text-purple-300 text-center">
-              <FiUpload size={24} className="mx-auto mb-2" />
-              <p>Drop files here</p>
+              <FiUpload size={isMobile ? 20 : 24} className="mx-auto mb-2" />
+              <p className={isMobile ? 'text-sm' : ''}>Drop files here</p>
             </div>
           </div>
         )}
+        
         {/* Advanced Options Panel */}
         {showAdvancedOptions && (
-          <div className="p-3 border-b border-white/10">
-            <div className="flex flex-wrap gap-2">
+          <div className={`${isMobile ? 'p-2' : 'p-3'} border-b border-white/10`}>
+            <div className={`flex flex-wrap ${isMobile ? 'gap-1' : 'gap-2'}`}>
               {/* Thinking Tag */}
               {supportsThinking && (
                 <button
                   onClick={() => setEnableThinking(!enableThinking)}
                   className={`
-                    flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all
+                    flex items-center gap-2 ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-full font-medium transition-all
                     ${enableThinking 
                       ? 'bg-purple-600/20 text-purple-300 border border-purple-500/50 shadow-md' 
                       : 'bg-neutral-800/60 text-white/60 border border-white/10 hover:bg-neutral-700/60'
                     }
                   `}
                 >
-                  <LuBrain size={16} />
+                  <LuBrain size={isMobile ? 14 : 16} />
                   Thinking
                 </button>
               )}
@@ -651,21 +655,21 @@ export default function PromptBar({
                 <button
                   onClick={() => setGrounding(prev => ({ ...prev, enabled: !prev.enabled }))}
                   className={`
-                    flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all
+                    flex items-center gap-2 ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-full font-medium transition-all
                     ${grounding.enabled 
                       ? 'bg-purple-600/20 text-purple-300 border border-purple-500/50 shadow-md' 
                       : 'bg-neutral-800/60 text-white/60 border border-white/10 hover:bg-neutral-700/60'
                     }
                   `}
                 >
-                  <TbBrandGoogle size={16} />
-                  Web Search
+                  <TbBrandGoogle size={isMobile ? 14 : 16} />
+                  {isMobile ? 'Web' : 'Web Search'}
                 </button>
               )}
             </div>
             
-            {/* Dynamic Threshold for Web Search */}
-            {grounding.enabled && selectedModelDef?.apiModel.includes('1.5') && (
+            {/* Dynamic Threshold for Web Search - Only show on desktop or when enabled */}
+            {grounding.enabled && selectedModelDef?.apiModel.includes('1.5') && !isMobile && (
               <div className="mt-3 p-2 bg-neutral-800/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <label className="text-xs text-white/60">Dynamic Threshold:</label>
@@ -688,8 +692,8 @@ export default function PromptBar({
               </div>
             )}
 
-            {/* TTS Options */}
-            {isTTSModel && (
+            {/* TTS Options - Simplified for mobile */}
+            {isTTSModel && !isMobile && (
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm text-white/80">
                   <FiVolume2 size={16} />
@@ -710,26 +714,26 @@ export default function PromptBar({
           </div>
         )}
 
-        <div className="p-1 flex-grow">
+        <div className={`${isMobile ? 'p-1' : 'p-1'} flex-grow`}>
           {attachments.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-2">
+            <div className={`${isMobile ? 'mb-2' : 'mb-3'} flex flex-wrap ${isMobile ? 'gap-1' : 'gap-2'}`}>
               {attachments.map((att, index) => (
                 <div key={index} className="relative group bg-neutral-700/60 rounded-lg p-1">
                    {att.file.type.startsWith('image/') ? (
-                    <img src={att.previewUrl} alt={att.file.name} className="h-16 w-16 object-cover rounded-md" />
+                    <img src={att.previewUrl} alt={att.file.name} className={`${isMobile ? 'h-12 w-12' : 'h-16 w-16'} object-cover rounded-md`} />
                    ) : att.file.type.startsWith('audio/') ? (
-                    <div className="h-16 w-24 flex flex-col items-center justify-center text-white p-1 rounded-md">
-                      <FiVolume2 size={20} />
-                      <span className="text-xs truncate w-full text-center mt-1">{att.file.name}</span>
+                    <div className={`${isMobile ? 'h-12 w-20' : 'h-16 w-24'} flex flex-col items-center justify-center text-white p-1 rounded-md`}>
+                      <FiVolume2 size={isMobile ? 16 : 20} />
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} truncate w-full text-center mt-1`}>{att.file.name}</span>
                     </div>
                    ) : (
-                    <div className="h-16 w-24 flex flex-col items-center justify-center text-white p-1 rounded-md">
-                      <FiPaperclip size={20} />
-                      <span className="text-xs truncate w-full text-center mt-1">{att.file.name}</span>
+                    <div className={`${isMobile ? 'h-12 w-20' : 'h-16 w-24'} flex flex-col items-center justify-center text-white p-1 rounded-md`}>
+                      <FiPaperclip size={isMobile ? 16 : 20} />
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} truncate w-full text-center mt-1`}>{att.file.name}</span>
                     </div>
                    )}
-                  <button onClick={() => removeAttachment(index)} className="absolute -top-1.5 -right-1.5 bg-gray-800 hover:bg-gray-700 rounded-full p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                    <FiX size={14} />
+                  <button onClick={() => removeAttachment(index)} className={`absolute ${isMobile ? '-top-1 -right-1' : '-top-1.5 -right-1.5'} bg-gray-800 hover:bg-gray-700 rounded-full ${isMobile ? 'p-0.5' : 'p-0.5'} text-white opacity-0 group-hover:opacity-100 transition-opacity`}>
+                    <FiX size={isMobile ? 12 : 14} />
                   </button>
                 </div>
               ))}
@@ -746,13 +750,15 @@ export default function PromptBar({
                   preview: e.target.value.substring(0, 50) + (e.target.value.length > 50 ? '...' : '')
                 });
               }}
-              className="
+              className={`
                 w-full outline-none
-                text-base text-white placeholder-purple-300/60 resize-none rounded-xl px-4 py-3
+                ${isMobile ? 'text-sm' : 'text-base'} text-white placeholder-purple-300/60 resize-none rounded-xl ${
+                  isMobile ? 'px-3 py-2' : 'px-4 py-3'
+                }
                 scrollbar-thin scrollbar-thumb-purple-500/30 scrollbar-track-transparent
                 transition-all
-              "
-              placeholder="Ask anything..."
+              `}
+              placeholder={isMobile ? "Ask anything..." : "Ask anything..."}
               disabled={isLoading}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -763,7 +769,7 @@ export default function PromptBar({
               }}
               rows={1}
               style={{ 
-                minHeight: '2.5rem', 
+                minHeight: isMobile ? '2rem' : '2.5rem', 
                 lineHeight: 1.5, 
                 scrollbarColor: 'rgba(168, 85, 247, 0.3) transparent', 
                 scrollbarWidth: 'thin' 
@@ -771,17 +777,17 @@ export default function PromptBar({
             />
           </div>
         </div>
-        <div className="px-3 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className={`${isMobile ? 'px-2 py-2' : 'px-3 py-2'} flex items-center justify-between`}>
+          <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}>
             <button 
               onClick={() => {
                 logger.debug('PromptBar: File upload button clicked');
                 fileInputRef.current?.click();
               }} 
-              className="text-white/70 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
+              className={`text-white/70 hover:text-white transition-colors ${isMobile ? 'p-1' : 'p-1.5'} rounded-full hover:bg-white/10`}
               title="Upload Files"
             >
-              <FiPlus size={22} />
+              <FiPlus size={isMobile ? 18 : 22} />
             </button>
             <input 
               type="file" 
@@ -799,10 +805,10 @@ export default function PromptBar({
                     logger.debug('PromptBar: Audio upload button clicked');
                     audioInputRef.current?.click();
                   }} 
-                  className="text-white/70 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
+                  className={`text-white/70 hover:text-white transition-colors ${isMobile ? 'p-1' : 'p-1.5'} rounded-full hover:bg-white/10`}
                   title="Upload Audio"
                 >
-                  <FiVolume2 size={20} />
+                  <FiVolume2 size={isMobile ? 16 : 20} />
                 </button>
                 <input 
                   type="file" 
@@ -831,43 +837,59 @@ export default function PromptBar({
                   setGrounding({ enabled: false, dynamicThreshold: 0.3 });
                   setTtsOptions({});
                 }}
-                className="bg-transparent text-sm text-white/80 outline-none border-none pr-2 h-8 rounded w-auto appearance-none cursor-pointer"
+                className={`bg-transparent ${isMobile ? 'text-xs' : 'text-sm'} text-white/80 outline-none border-none pr-2 ${
+                  isMobile ? 'h-6' : 'h-8'
+                } rounded w-auto appearance-none cursor-pointer`}
               >
                 {models.map(model => (
-                  <option key={model.id} value={model.id} className="bg-neutral-800">{model.name}</option>
+                  <option key={model.id} value={model.id} className="bg-neutral-800">
+                    {isMobile ? model.name.split(' ')[0] : model.name}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Advanced Options Toggle */}
-            <button 
-              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-              className={`text-white/70 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10 ${
-                showAdvancedOptions ? 'bg-white/10 text-white' : ''
-              }`}
-              title="Advanced Options"
-                          >
+          <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}>
+            {/* Advanced Options Toggle - Show on mobile as compact button */}
+            {isMobile ? (
+              <button 
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className={`text-white/70 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${
+                  showAdvancedOptions ? 'bg-white/10 text-white' : ''
+                }`}
+                title="Options"
+              >
+                <IoOptionsOutline size={16} />
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className={`text-white/70 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10 ${
+                  showAdvancedOptions ? 'bg-white/10 text-white' : ''
+                }`}
+                title="Advanced Options"
+              >
                 <IoOptionsOutline size={20} />
               </button>
+            )}
             
             {/* Voice Recording Button */}
             <button 
               onClick={() => onShowVoiceModal?.()}
-              className={`transition-colors p-1.5 rounded-full hover:bg-white/10 ${
+              className={`transition-colors ${isMobile ? 'p-1' : 'p-1.5'} rounded-full hover:bg-white/10 ${
                 isRecording ? 'text-red-400' : 'text-white/70 hover:text-white'
               }`} 
               disabled={!supportsAudioInput}
               title={supportsAudioInput ? "Voice Input" : "Voice input not supported for this model"}
             >
-              <FiMic size={20} />
+              <FiMic size={isMobile ? 16 : 20} />
             </button>
             
             <button
               onClick={isLoading ? handleCancelRequest : handleAskLLM}
               disabled={shouldDisableSend && !isLoading}
               className={`
-                w-9 h-9 rounded-full text-white
+                ${isMobile ? 'w-8 h-8' : 'w-9 h-9'} rounded-full text-white
                 flex items-center justify-center transition-colors
                 ${isLoading 
                   ? 'bg-red-600 hover:bg-red-500' 
@@ -877,9 +899,9 @@ export default function PromptBar({
               title={isLoading ? "Stop request" : "Send message"}
             >
               {isLoading ? (
-                <FaStop size={14} />
+                <FaStop size={isMobile ? 12 : 14} />
               ) : (
-                <FiSend size={18} />
+                <FiSend size={isMobile ? 14 : 18} />
               )}
             </button>
           </div>
@@ -891,29 +913,31 @@ export default function PromptBar({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
              onClick={() => setShowModelInfo(false)}>
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-          <div className="relative z-10 bg-neutral-900 rounded-xl border border-white/10 p-6 max-w-md w-full"
+          <div className={`relative z-10 bg-neutral-900 ${isMobile ? 'rounded-lg' : 'rounded-xl'} border border-white/10 ${
+            isMobile ? 'p-4 max-w-sm' : 'p-6 max-w-md'
+          } w-full`}
                onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">{selectedModelDef.name}</h3>
+              <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-white`}>{selectedModelDef.name}</h3>
               <button
                 onClick={() => setShowModelInfo(false)}
                 className="text-white/60 hover:text-white transition-colors"
               >
-                <FiX size={20} />
+                <FiX size={isMobile ? 18 : 20} />
               </button>
             </div>
             
-            <div className="space-y-3 text-sm">
+            <div className={`space-y-3 ${isMobile ? 'text-xs' : 'text-sm'}`}>
               <div>
                 <span className="text-white/60">Model ID:</span>
-                <span className="text-white ml-2 font-mono">{selectedModelDef.id}</span>
+                <span className={`text-white ml-2 font-mono ${isMobile ? 'text-xs' : ''}`}>{selectedModelDef.id}</span>
               </div>
               
               <div>
                 <span className="text-white/60">Supported Inputs:</span>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selectedModelDef.supportedInputs.map(input => (
-                    <span key={input} className="px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded text-xs">
+                    <span key={input} className={`${isMobile ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5'} bg-blue-600/20 text-blue-300 rounded text-xs`}>
                       {input}
                     </span>
                   ))}
@@ -924,7 +948,7 @@ export default function PromptBar({
                 <span className="text-white/60">Supported Outputs:</span>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selectedModelDef.supportedOutputs.map(output => (
-                    <span key={output} className="px-2 py-0.5 bg-green-600/20 text-green-300 rounded text-xs">
+                    <span key={output} className={`${isMobile ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5'} bg-green-600/20 text-green-300 rounded text-xs`}>
                       {output}
                     </span>
                   ))}
@@ -936,7 +960,7 @@ export default function PromptBar({
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selectedModelDef.capabilities && Object.entries(selectedModelDef.capabilities).map(([key, value]) => 
                     value && (
-                      <span key={key} className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs">
+                      <span key={key} className={`${isMobile ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5'} bg-purple-600/20 text-purple-300 rounded text-xs`}>
                         {key}
                       </span>
                     )
@@ -948,11 +972,11 @@ export default function PromptBar({
                 <div>
                   <span className="text-white/60">Features:</span>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-300 rounded text-xs">
+                    <span className={`${isMobile ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5'} bg-yellow-600/20 text-yellow-300 rounded text-xs`}>
                       Web Search
                     </span>
                     {selectedModelDef.supportsCitations && (
-                      <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-300 rounded text-xs">
+                      <span className={`${isMobile ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5'} bg-yellow-600/20 text-yellow-300 rounded text-xs`}>
                         Citations
                       </span>
                     )}

@@ -42,9 +42,10 @@ const controlsStyle = {
 
 interface ChatCanvasProps {
   disableInteractions?: boolean;
+  isMobile?: boolean;
 }
 
-const ChatCanvas: React.FC<ChatCanvasProps> = ({ disableInteractions = false }) => {
+const ChatCanvas: React.FC<ChatCanvasProps> = ({ disableInteractions = false, isMobile = false }) => {
   const { 
     nodes, 
     edges, 
@@ -64,21 +65,21 @@ const ChatCanvas: React.FC<ChatCanvasProps> = ({ disableInteractions = false }) 
         ...edge,
         style: {
           stroke: isInActivePath ? '#a855f7' : '#555555',
-          strokeWidth: isInActivePath ? 4 : 2,
+          strokeWidth: isInActivePath ? (isMobile ? 3 : 4) : (isMobile ? 1.5 : 2),
           strokeOpacity: isInActivePath ? 0.9 : 0.5,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: isInActivePath ? '#a855f7' : '#555555',
-          width: isInActivePath ? 12 : 8,
-          height: isInActivePath ? 12 : 8,
+          width: isInActivePath ? (isMobile ? 10 : 12) : (isMobile ? 6 : 8),
+          height: isInActivePath ? (isMobile ? 10 : 12) : (isMobile ? 6 : 8),
           strokeWidth: 0,
         },
         className: isInActivePath ? 'animated-edge' : '',
         animated: isInActivePath,
       };
     });
-  }, [edges, activePath.edgeIds]);
+  }, [edges, activePath.edgeIds, isMobile]);
 
   const handleConnect = useCallback(
     (params: any) => {
@@ -97,7 +98,8 @@ const ChatCanvas: React.FC<ChatCanvasProps> = ({ disableInteractions = false }) 
               ...node,
               data: {
                 ...node.data,
-                isLoading: thread?.isLoading || false
+                isLoading: thread?.isLoading || false,
+                isMobile
               }
             };
           })}
@@ -108,25 +110,38 @@ const ChatCanvas: React.FC<ChatCanvasProps> = ({ disableInteractions = false }) 
           nodeTypes={nodeTypes}
           fitView
           style={flowStyle}
-          minZoom={0.2}
-          maxZoom={1.5}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+          minZoom={isMobile ? 0.3 : 0.2}
+          maxZoom={isMobile ? 2 : 1.5}
+          defaultViewport={{ x: 0, y: 0, zoom: isMobile ? 0.7 : 0.5 }}
           nodesDraggable={!disableInteractions}
           edgesFocusable={!disableInteractions}
           panOnDrag={!disableInteractions}
           zoomOnScroll={!disableInteractions}
           zoomOnPinch={!disableInteractions}
           panOnScroll={!disableInteractions}
+          // Mobile-specific props
+          zoomOnDoubleClick={!isMobile}
+          panOnScrollMode={isMobile ? 'free' : 'vertical'}
+          preventScrolling={isMobile}
         >
           <Background 
             variant={BackgroundVariant.Dots} 
-            gap={20} 
-            size={1} 
+            gap={isMobile ? 15 : 20} 
+            size={isMobile ? 0.8 : 1} 
             color="rgba(255, 255, 255, 0.8)"
             className="opacity-30"
           />
           <Controls 
             className="backdrop-blur-sm bg-black/30 border border-white/10 rounded-lg p-1"
+            showZoom={!isMobile}
+            showFitView={true}
+            showInteractive={!isMobile}
+            fitViewOptions={{ 
+              padding: isMobile ? 0.1 : 0.2,
+              includeHiddenNodes: false,
+              minZoom: isMobile ? 0.3 : 0.2,
+              maxZoom: isMobile ? 2 : 1.5,
+            }}
           />
         </ReactFlow>
       </div>

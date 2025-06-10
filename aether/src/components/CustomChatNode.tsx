@@ -24,8 +24,9 @@ function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[
   return path;
 }
 
-function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isLoading?: boolean } }) {
+function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isLoading?: boolean; isMobile?: boolean } }) {
   const isLoading = data.isLoading ?? false;
+  const isMobile = data.isMobile ?? false;
   const [input, setInput] = useState<string>('');
   const { 
     addMessageToNode, 
@@ -157,25 +158,26 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
       tabIndex={0}
       style={{ 
         position: 'relative', 
-        width: 450,
-        height: 200
+        width: isMobile ? 300 : 450,
+        height: isMobile ? 150 : 200
       }}
     >
       {/* Root node indicator - glowing circle */}
       {isRootNode && (
-        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-          <div className="w-6 h-6 rounded-full bg-purple-500 animate-pulse shadow-[0_0_10px_4px_rgba(168,85,247,0.4)] mb-1"></div>
-          <div className="w-[2px] h-5 bg-purple-500/50"></div>
+        <div className={`absolute ${isMobile ? '-top-8 left-1/2' : '-top-12 left-1/2'} transform -translate-x-1/2 flex flex-col items-center`}>
+          <div className={`${isMobile ? 'w-4 h-4' : 'w-6 h-6'} rounded-full bg-purple-500 animate-pulse shadow-[0_0_10px_4px_rgba(168,85,247,0.4)] mb-1`}></div>
+          <div className={`w-[2px] ${isMobile ? 'h-3' : 'h-5'} bg-purple-500/50`}></div>
         </div>
       )}
       
       <Handle 
         type="target" 
         position={Position.Top} 
-        className={`w-2 h-2 ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
+        className={`${isMobile ? 'w-1.5 h-1.5' : 'w-2 h-2'} ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
       />
-      <div className="flex justify-between items-center mb-3">
-        <div className="font-medium text-base truncate flex-1 text-white group relative">
+      
+      <div className={`flex justify-between items-center ${isMobile ? 'mb-2' : 'mb-3'}`}>
+        <div className={`font-medium ${isMobile ? 'text-sm' : 'text-base'} truncate flex-1 text-white group relative`}>
           <div className="flex items-center gap-2">
             {isRootNode ? (
               <span className="text-purple-400">Root Node</span>
@@ -183,7 +185,7 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
               <>
                 <span className="text-white/90">{data.label || 'New Chat'}</span>
                 {data.chatHistory.length > 0 && (
-                  <span className="text-xs text-white/50">
+                  <span className={`${isMobile ? 'text-xs' : 'text-xs'} text-white/50`}>
                     ({data.chatHistory.length} messages)
                   </span>
                 )}
@@ -191,65 +193,72 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
             )}
           </div>
           {/* Tooltip for long titles */}
-          {data.label && data.label.length > 30 && (
-            <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50">
+          {data.label && data.label.length > (isMobile ? 20 : 30) && (
+            <div className={`absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white ${
+              isMobile ? 'text-xs' : 'text-sm'
+            } rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50`}>
               {data.label}
             </div>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className={`flex ${isMobile ? 'gap-1' : 'gap-2'}`}>
           {hasResponse && (
             <button 
               onClick={handleBranch} 
               className={iconButtonClass}
               title="Branch Chat"
             >
-              <FiPlus size={16} />
+              <FiPlus size={isMobile ? 14 : 16} />
             </button>
           )}
           <button onClick={handleReset} className={iconButtonClass} title="Reset Node">
-            <FiRefreshCw size={16} />
+            <FiRefreshCw size={isMobile ? 14 : 16} />
           </button>
           {!isRootNode && (
             <button onClick={handleDelete} className="text-red-300 hover:text-red-200" title="Delete Node">
-              <FiTrash2 size={16} />
+              <FiTrash2 size={isMobile ? 14 : 16} />
             </button>
           )}
         </div>
       </div>
+      
       {hasResponse ? (
         <div className="relative">
           {lastMessageHasAttachments && (
-            <div className="mb-2 flex flex-wrap gap-1">
+            <div className={`${isMobile ? 'mb-1' : 'mb-2'} flex flex-wrap gap-1`}>
               {lastModelMessage?.attachments?.map((att, idx) => (
                 <div key={idx} className="relative">
                   {att.type.startsWith('image/') ? (
                     <img 
                       src={att.previewUrl || `data:${att.type};base64,${att.data}`}
                       alt={att.name}
-                      className="h-12 w-12 object-cover rounded cursor-pointer hover:scale-105 transition-transform"
+                      className={`${isMobile ? 'h-8 w-8' : 'h-12 w-12'} object-cover rounded cursor-pointer hover:scale-105 transition-transform`}
                       onClick={() => window.open(att.previewUrl || `data:${att.type};base64,${att.data}`, '_blank')}
                     />
                   ) : att.type.startsWith('audio/') ? (
-                    <div className="flex items-center gap-1 bg-neutral-800/50 rounded px-2 py-1">
-                      <FiFileText size={12} />
-                      <span className="text-xs text-white/80">{att.name}</span>
+                    <div className={`flex items-center gap-1 bg-neutral-800/50 rounded ${isMobile ? 'px-1 py-0.5' : 'px-2 py-1'}`}>
+                      <FiFileText size={isMobile ? 10 : 12} />
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} text-white/80`}>{att.name}</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1 bg-neutral-800/50 rounded px-2 py-1">
-                      <FiFileText size={12} />
-                      <span className="text-xs text-white/80">{att.name}</span>
+                    <div className={`flex items-center gap-1 bg-neutral-800/50 rounded ${isMobile ? 'px-1 py-0.5' : 'px-2 py-1'}`}>
+                      <FiFileText size={isMobile ? 10 : 12} />
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} text-white/80`}>{att.name}</span>
                     </div>
                   )}
                 </div>
               ))}
             </div>
           )}
-          <div className="max-h-[120px] overflow-y-auto mb-2 text-sm whitespace-pre-wrap rounded-xl bg-neutral-900/30 p-3 text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent relative"
+          <div className={`${isMobile ? 'max-h-[80px]' : 'max-h-[120px]'} overflow-y-auto ${
+            isMobile ? 'mb-1' : 'mb-2'
+          } ${isMobile ? 'text-xs' : 'text-sm'} whitespace-pre-wrap rounded-xl bg-neutral-900/30 ${
+            isMobile ? 'p-2' : 'p-3'
+          } text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent relative`}
             style={{ scrollbarColor: 'rgba(255,255,255,0.7) transparent', scrollbarWidth: 'thin' }}
           >
             {responseHasMarkdown ? (
-              <div className="markdown-content text-sm">
+              <div className={`markdown-content ${isMobile ? 'text-xs' : 'text-sm'}`}>
                 <MarkdownRenderer content={lastModelResponse} />
               </div>
             ) : (
@@ -258,10 +267,10 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
             
             {/* Copy button for model responses */}
             {hasResponse && !isLoading && (
-              <div className="absolute top-2 right-2">
+              <div className={`absolute ${isMobile ? 'top-1 right-1' : 'top-2 right-2'}`}>
                 <CopyButton 
                   content={lastModelResponse} 
-                  size={14} 
+                  size={isMobile ? 12 : 14} 
                   className="opacity-60 hover:opacity-100"
                 />
               </div>
@@ -269,25 +278,26 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
             
             {/* Gemini logo at bottom right if Gemini model */}
             {isGeminiModel() && (
-              <div className="absolute bottom-2 right-2 group" title={getModelName()}>
+              <div className={`absolute ${isMobile ? 'bottom-1 right-1' : 'bottom-2 right-2'} group`} title={getModelName()}>
                 <span className="group-hover:scale-110 transition-transform cursor-pointer">
-                  <SiGooglegemini size={20} className="text-blue-300 drop-shadow-md" />
+                  <SiGooglegemini size={isMobile ? 16 : 20} className="text-blue-300 drop-shadow-md" />
                 </span>
               </div>
             )}
             {/* Loading animation if isLoading */}
             {isLoading && (
-              <div className="absolute bottom-2 left-2">
+              <div className={`absolute ${isMobile ? 'bottom-1 left-1' : 'bottom-2 left-2'}`}>
                 <LoadingDots />
               </div>
             )}
           </div>
         </div>
       ) : null}
+      
       <Handle 
         type="source" 
         position={Position.Bottom} 
-        className={`w-2 h-2 ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
+        className={`${isMobile ? 'w-1.5 h-1.5' : 'w-2 h-2'} ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
       />
     </div>
   );

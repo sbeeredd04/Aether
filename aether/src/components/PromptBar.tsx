@@ -838,12 +838,12 @@ export default function PromptBar({
                   setTtsOptions({});
                 }}
                 className={`bg-transparent ${isMobile ? 'text-xs' : 'text-sm'} text-white/80 outline-none border-none pr-2 ${
-                  isMobile ? 'h-6' : 'h-8'
+                  isMobile ? 'h-6 min-w-[100px]' : 'h-8'
                 } rounded w-auto appearance-none cursor-pointer`}
               >
                 {models.map(model => (
                   <option key={model.id} value={model.id} className="bg-neutral-800">
-                    {isMobile ? model.name.split(' ')[0] : model.name}
+                    {model.name}
                   </option>
                 ))}
               </select>

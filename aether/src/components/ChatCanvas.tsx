@@ -121,7 +121,6 @@ const ChatCanvas: React.FC<ChatCanvasProps> = ({ disableInteractions = false, is
           panOnScroll={!disableInteractions}
           // Mobile-specific props
           zoomOnDoubleClick={!isMobile}
-          panOnScrollMode={isMobile ? 'free' : 'vertical'}
           preventScrolling={isMobile}
         >
           <Background 

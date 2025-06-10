@@ -138,7 +138,8 @@ export default function WorkspacePage() {
   const handleBranch = () => {
     if (activeNodeId) {
       const newNodeId = createNodeAndEdge(activeNodeId, 'New Chat', 'branch');
-      console.log('Branch created:', { sourceNodeId: activeNodeId, newNodeId });
+      setActiveNodeId(newNodeId); // Set the new branch as active
+      console.log('Branch created and set as active:', { sourceNodeId: activeNodeId, newNodeId });
     }
   };
 

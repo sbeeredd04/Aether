@@ -150,6 +150,18 @@ export default function NodeSidebar({
     });
   };
 
+  // Clean up markdown content to remove empty list items from thinking models
+  const cleanMarkdownContent = (content: string) => {
+    if (!content) return content;
+    
+    // Remove empty list items and their containers
+    return content
+      .replace(/^\s*[\*\-\+]\s*$/gm, '') // Remove empty bullet points
+      .replace(/^\s*\d+\.\s*$/gm, '') // Remove empty numbered list items
+      .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up excessive newlines
+      .trim();
+  };
+
   if (!isOpen || !data) return null;
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
@@ -331,10 +343,10 @@ export default function NodeSidebar({
                             <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white/80 font-space-grotesk`}>
                               {hasMarkdown(parsedContent.thoughts) ? (
                                 <div className="markdown-content font-space-grotesk">
-                                  <MarkdownRenderer content={parsedContent.thoughts} />
+                                  <MarkdownRenderer content={cleanMarkdownContent(parsedContent.thoughts)} />
                                 </div>
                               ) : (
-                                <div className="whitespace-pre-wrap font-space-grotesk">{parsedContent.thoughts}</div>
+                                <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.thoughts)}</div>
                               )}
                             </div>
                           </div>
@@ -347,19 +359,19 @@ export default function NodeSidebar({
                       // Show only the answer part if thoughts are present
                       parsedContent.answer && (contentHasMarkdown ? (
                         <div className="markdown-content font-space-grotesk">
-                          <MarkdownRenderer content={parsedContent.answer} />
+                          <MarkdownRenderer content={cleanMarkdownContent(parsedContent.answer)} />
                         </div>
                       ) : (
-                        <div className="whitespace-pre-wrap font-space-grotesk">{parsedContent.answer}</div>
+                        <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.answer)}</div>
                       ))
                     ) : (
                       // Show full content for non-thinking responses
                       isModel && contentHasMarkdown ? (
                         <div className="markdown-content font-space-grotesk">
-                          <MarkdownRenderer content={msg.content} />
+                          <MarkdownRenderer content={cleanMarkdownContent(msg.content)} />
                         </div>
                       ) : (
-                        <div className="whitespace-pre-wrap font-space-grotesk">{msg.content}</div>
+                        <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(msg.content)}</div>
                       )
                     )}
 

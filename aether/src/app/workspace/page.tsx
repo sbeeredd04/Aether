@@ -24,6 +24,8 @@ interface StreamingState {
   isShowingThoughts: boolean;
   isThinkingPhase: boolean;
   messagePhase: boolean;
+  thoughtStartTime?: number;
+  thoughtEndTime?: number;
 }
 
 export default function WorkspacePage() {
@@ -210,7 +212,8 @@ export default function WorkspacePage() {
       currentMessage: '',
       isShowingThoughts: false,
       isThinkingPhase: true,
-      messagePhase: false
+      messagePhase: false,
+      thoughtStartTime: Date.now()
     });
   };
 
@@ -230,20 +233,22 @@ export default function WorkspacePage() {
       ...prev,
       currentMessage: prev.currentMessage + messageChunk,
       messagePhase: true,
-      isThinkingPhase: false
+      isThinkingPhase: false,
+      thoughtEndTime: prev.thoughtEndTime || (prev.isThinkingPhase ? Date.now() : prev.thoughtEndTime)
     }));
   };
 
   const handleStreamingComplete = () => {
     console.log('🔄 Workspace: Streaming complete');
-    setStreamingState({
+    setStreamingState(prev => ({
       isStreaming: false,
       currentThoughts: '',
       currentMessage: '',
       isShowingThoughts: false,
       isThinkingPhase: false,
-      messagePhase: false
-    });
+      messagePhase: false,
+      thoughtEndTime: prev.thoughtEndTime || Date.now()
+    }));
   };
 
   const handleStreamingError = (error: string) => {

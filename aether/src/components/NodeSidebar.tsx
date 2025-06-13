@@ -17,6 +17,8 @@ interface StreamingState {
   isShowingThoughts: boolean;
   isThinkingPhase: boolean;
   messagePhase: boolean;
+  thoughtStartTime?: number;
+  thoughtEndTime?: number;
 }
 
 interface NodeSidebarProps {
@@ -53,6 +55,7 @@ export default function NodeSidebar({
   const scrollRef = useRef<HTMLDivElement>(null);
   const { getPathToNode, nodes, edges } = useChatStore();
   const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set());
+  const [thoughtTimings, setThoughtTimings] = useState<Map<number, number>>(new Map());
   
   // Get all messages in the conversation thread from root to current node
   const threadMessages = nodeId ? getFullConversationThread(nodeId) : [];
@@ -128,6 +131,25 @@ export default function NodeSidebar({
     }
   }, [threadMessages.length, streamingState?.currentThoughts, streamingState?.currentMessage]);
 
+  // Track thought timing
+  useEffect(() => {
+    if (streamingState?.isThinkingPhase && !streamingState.thoughtStartTime) {
+      // Record start time when thinking begins
+      const startTime = Date.now();
+      if (streamingState) {
+        streamingState.thoughtStartTime = startTime;
+      }
+    }
+    
+    if (streamingState?.messagePhase && streamingState.thoughtStartTime && !streamingState.thoughtEndTime) {
+      // Record end time when thinking ends and message phase begins
+      const endTime = Date.now();
+      if (streamingState) {
+        streamingState.thoughtEndTime = endTime;
+      }
+    }
+  }, [streamingState?.isThinkingPhase, streamingState?.messagePhase]);
+
   // Parse thoughts from model response
   const parseThoughts = (content: string) => {
     const thoughtsIndex = content.indexOf('**Thoughts:**\n');
@@ -162,6 +184,22 @@ export default function NodeSidebar({
     });
   };
 
+  // Check if thoughts are expanded for streaming (separate from completed thoughts)
+  const isStreamingThoughtsExpanded = expandedThoughts.has(-1); // Use -1 for streaming thoughts
+
+  // Toggle streaming thoughts expansion
+  const toggleStreamingThoughts = () => {
+    setExpandedThoughts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(-1)) {
+        newSet.delete(-1);
+      } else {
+        newSet.add(-1);
+      }
+      return newSet;
+    });
+  };
+
   // Clean up markdown content to remove empty list items from thinking models
   const cleanMarkdownContent = (content: string) => {
     if (!content) return content;
@@ -188,12 +226,8 @@ export default function NodeSidebar({
     if (!streamingState?.isStreaming) return '';
     
     let content = '';
-    if (streamingState.currentThoughts) {
-      content += `**Thoughts:**\n${streamingState.currentThoughts}`;
-      if (streamingState.currentMessage) {
-        content += `\n\n---\n\n**Answer:**\n${streamingState.currentMessage}`;
-      }
-    } else if (streamingState.currentMessage) {
+    // Only show the message part in the main content area, thoughts are shown in preview
+    if (streamingState.currentMessage) {
       content = streamingState.currentMessage;
     }
     
@@ -233,6 +267,122 @@ export default function NodeSidebar({
         <span className="inline-block w-[2px] h-4 bg-white animate-pulse ml-1"></span>
       </div>
     );
+  };
+
+  // Extract first lines from streaming thoughts
+  const getStreamingThoughtPreviews = (thoughts: string) => {
+    if (!thoughts) return [];
+    
+    // Split thoughts into paragraphs/sections
+    const paragraphs = thoughts.split('\n\n').filter(p => p.trim());
+    const previews: string[] = [];
+    
+    for (const paragraph of paragraphs) {
+      const lines = paragraph.split('\n').filter(line => line.trim());
+      if (lines.length > 0) {
+        // Take the first line of each paragraph/section
+        const firstLine = lines[0].trim();
+        
+        // Clean up the line - remove markdown formatting, extra spaces
+        const cleanLine = firstLine
+          .replace(/^\*\*(.+)\*\*$/, '$1') // Remove bold formatting
+          .replace(/^\*(.+)\*$/, '$1')     // Remove italic formatting
+          .replace(/^#+\s*/, '')          // Remove header markdown
+          .trim();
+        
+        // Only add meaningful lines (not just "I'm" or very short fragments)
+        if (cleanLine.length > 5 && !cleanLine.match(/^(I'm|The|This|It|That)\s/)) {
+          previews.push(cleanLine);
+        } else if (cleanLine.length > 15) {
+          // For longer lines starting with common words, still include them
+          previews.push(cleanLine);
+        }
+      }
+    }
+    
+    // If no good previews found, try line-by-line approach
+    if (previews.length === 0) {
+      const allLines = thoughts.split('\n').filter(line => line.trim());
+      for (const line of allLines) {
+        const trimmed = line.trim()
+          .replace(/^\*\*(.+)\*\*$/, '$1')
+          .replace(/^\*(.+)\*$/, '$1')
+          .replace(/^#+\s*/, '');
+        
+        if (trimmed.length > 10 && !trimmed.includes('...')) {
+          previews.push(trimmed);
+          if (previews.length >= 3) break; // Limit during extraction
+        }
+      }
+    }
+    
+    return previews.slice(0, 4); // Limit to 4 preview lines max
+  };
+
+  // Calculate thought duration
+  const getThoughtDuration = (messageIndex: number) => {
+    const savedDuration = thoughtTimings.get(messageIndex);
+    if (savedDuration) {
+      return Math.round(savedDuration / 1000);
+    }
+    
+    if (streamingState?.thoughtStartTime && streamingState?.thoughtEndTime) {
+      const duration = streamingState.thoughtEndTime - streamingState.thoughtStartTime;
+      const seconds = Math.round(duration / 1000);
+      setThoughtTimings(prev => new Map(prev).set(messageIndex, duration));
+      return seconds;
+    }
+    
+    return 0;
+  };
+
+  // Get section title from thoughts (only headers, not paragraphs)
+  const getThoughtTitle = (thoughts: string, isStreaming = false) => {
+    if (!thoughts) return isStreaming ? 'Starting analysis...' : '';
+    
+    if (isStreaming) {
+      // For streaming, find the LATEST section header (marked with ** or #)
+      const lines = thoughts.split('\n').filter(line => line.trim());
+      
+      // Look for the most recent header (working backwards)
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim();
+        
+        // Check for markdown headers (# or **text**)
+        if (line.startsWith('#') || (line.startsWith('**') && line.endsWith('**'))) {
+          const cleaned = line
+            .replace(/^#+\s*/, '')           // Remove # headers
+            .replace(/^\*\*(.+)\*\*$/, '$1') // Remove ** bold formatting
+            .trim();
+          
+          if (cleaned.length > 5 && cleaned.length < 80) { // Reasonable title length
+            return cleaned;
+          }
+        }
+      }
+      
+      // Fallback: look for any line that looks like a title (shorter, meaningful)
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim();
+        if (line.length > 10 && line.length < 60 && !line.includes('.') && !line.startsWith('I')) {
+          return line;
+        }
+      }
+      
+      return 'Processing...';
+    }
+    
+    // For completed thoughts, we don't show the title anymore - just return empty
+    return '';
+  };
+
+  // Get streaming completion timing
+  const getStreamingThoughtDuration = () => {
+    if (streamingState?.thoughtStartTime && streamingState?.thoughtEndTime) {
+      const duration = streamingState.thoughtEndTime - streamingState.thoughtStartTime;
+      return Math.round(duration / 1000);
+    }
+    return 0;
   };
 
   if (!isOpen || !data) return null;
@@ -357,10 +507,10 @@ export default function NodeSidebar({
                       <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-gray-300/80 font-space-grotesk`}>
                         {isUser ? 'You' : getModelName((msg as any).modelId)}
                       </div>
-                      {/* Copy button for model responses */}
-                      {isModel && displayContent && (
+                      {/* Copy button for both user and model responses */}
+                      {(isUser || (isModel && displayContent)) && (
                         <CopyButton 
-                          content={parsedContent?.hasThoughts ? parsedContent.answer || displayContent : displayContent} 
+                          content={isUser ? msg.content : (parsedContent?.hasThoughts ? parsedContent.answer || displayContent : displayContent)} 
                           size={isMobile ? 10 : 12} 
                           className="opacity-60 hover:opacity-100"
                         />
@@ -400,28 +550,100 @@ export default function NodeSidebar({
                     )}
                     
                     {/* Thoughts dropdown for model messages */}
-                    {isModel && parsedContent?.hasThoughts && !isStreaming && (
+                    {isModel && (parsedContent?.hasThoughts || (isStreaming && streamingState?.currentThoughts)) && (
                       <div className="mb-2">
+                        {isStreaming && streamingState?.currentThoughts ? (
+                          // Streaming thoughts dropdown
+                          <div className="mb-2">
+                            <button
+                              onClick={() => toggleStreamingThoughts()}
+                              className={`flex items-start gap-2 ${isMobile ? 'text-sm' : 'text-base'} text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk w-full text-left`}
+                            >
+                              <div className="flex-shrink-0 mt-1">
+                                {isStreamingThoughtsExpanded ? <FiChevronDown size={isMobile ? 14 : 16} /> : <FiChevronRight size={isMobile ? 14 : 16} />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 text-white/90 leading-relaxed">
+                                  {streamingState.isThinkingPhase ? (
+                                    <>
+                                      <span className="font-semibold text-blue-300">Thinking</span>
+                                      <div className="flex gap-1 mr-2">
+                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:200ms]"></div>
+                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:400ms]"></div>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <span className="font-semibold text-blue-400">Thought:</span>
+                                  )}
+                                  <span className="flex-1">
+                                    {getThoughtTitle(streamingState.currentThoughts, true)}
+                                  </span>
+                                </div>
+                                {!streamingState.isThinkingPhase && (() => {
+                                  const duration = getStreamingThoughtDuration();
+                                  return duration > 0 ? (
+                                    <div className="text-blue-400/70 text-sm mt-2 flex items-center gap-1">
+                                      <span>thought for {duration} second{duration !== 1 ? 's' : ''}</span>
+                                      <span className="text-blue-400">●</span>
+                                    </div>
+                                  ) : null;
+                                })()}
+                              </div>
+                            </button>
+                            {isStreamingThoughtsExpanded && (
+                              <div className={`mt-3 mb-3 ${isMobile ? 'p-3' : 'p-4'} bg-black/20 rounded-lg border border-blue-500/20`}>
+                                <div className={`${isMobile ? 'text-sm' : 'text-base'} text-white/90 font-space-grotesk leading-relaxed`}>
+                                  {hasMarkdown(streamingState.currentThoughts) ? (
+                                    <div className="markdown-content font-space-grotesk">
+                                      <MarkdownRenderer content={cleanMarkdownContent(streamingState.currentThoughts)} />
+                                    </div>
+                                  ) : (
+                                    <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(streamingState.currentThoughts)}</div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Completed thoughts dropdown
+                          <>
                         <button
                           onClick={() => toggleThoughts(idx)}
-                          className={`flex items-center gap-2 ${isMobile ? 'text-xs' : 'text-xs'} text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk`}
-                        >
-                          {isThoughtsExpanded ? <FiChevronDown size={isMobile ? 12 : 14} /> : <FiChevronRight size={isMobile ? 12 : 14} />}
-                          {isThoughtsExpanded ? 'Hide' : 'Show'} Thoughts
+                              className={`flex items-start gap-2 ${isMobile ? 'text-sm' : 'text-base'} text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk w-full text-left`}
+                            >
+                              <div className="flex-shrink-0 mt-0.5">
+                                {isThoughtsExpanded ? <FiChevronDown size={isMobile ? 14 : 16} /> : <FiChevronRight size={isMobile ? 14 : 16} />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                {(() => {
+                                  const duration = getThoughtDuration(idx);
+                                  return (
+                                    <div className="text-blue-400/90 flex items-center gap-1 leading-relaxed">
+                                      <span>Thought for {duration} second{duration !== 1 ? 's' : ''}</span>
+                                      <span className="text-blue-400">●</span>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                         </button>
                         {isThoughtsExpanded && (
-                          <div className={`mt-2 ${isMobile ? 'p-2' : 'p-3'} bg-black/20 rounded-lg border border-blue-500/20`}>
-                            <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-blue-300 mb-2 font-space-grotesk`}>Thoughts:</div>
-                            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white/80 font-space-grotesk`}>
-                              {hasMarkdown(parsedContent.thoughts) ? (
-                                <div className="markdown-content font-space-grotesk">
-                                  <MarkdownRenderer content={cleanMarkdownContent(parsedContent.thoughts)} />
+                              <div className={`mt-3 mb-3 ${isMobile ? 'p-3' : 'p-4'} bg-black/20 rounded-lg border border-blue-500/20`}>
+                                <div className={`${isMobile ? 'text-sm' : 'text-base'} font-semibold text-blue-300 mb-3 font-space-grotesk`}>
+                                  Full Thought Process:
+                                </div>
+                                <div className={`${isMobile ? 'text-sm' : 'text-base'} text-white/90 font-space-grotesk leading-relaxed`}>
+                                  {hasMarkdown(parsedContent!.thoughts) ? (
+                                    <div className="markdown-content font-space-grotesk">
+                                      <MarkdownRenderer content={cleanMarkdownContent(parsedContent!.thoughts)} />
                                 </div>
                               ) : (
-                                <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.thoughts)}</div>
+                                    <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent!.thoughts)}</div>
                               )}
                             </div>
                           </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -431,21 +653,21 @@ export default function NodeSidebar({
                       <StreamingContent content={displayContent} />
                     ) : (
                       isModel && parsedContent?.hasThoughts ? (
-                        // Show only the answer part if thoughts are present
-                        parsedContent.answer && (contentHasMarkdown ? (
-                          <div className="markdown-content font-space-grotesk">
-                            <MarkdownRenderer content={cleanMarkdownContent(parsedContent.answer)} />
-                          </div>
-                        ) : (
-                          <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.answer)}</div>
-                        ))
+                      // Show only the answer part if thoughts are present
+                      parsedContent.answer && (contentHasMarkdown ? (
+                        <div className="markdown-content font-space-grotesk">
+                          <MarkdownRenderer content={cleanMarkdownContent(parsedContent.answer)} />
+                        </div>
                       ) : (
-                        // Show full content for non-thinking responses
-                        isModel && contentHasMarkdown ? (
-                          <div className="markdown-content font-space-grotesk">
+                        <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.answer)}</div>
+                      ))
+                    ) : (
+                      // Show full content for non-thinking responses
+                      isModel && contentHasMarkdown ? (
+                        <div className="markdown-content font-space-grotesk">
                             <MarkdownRenderer content={cleanMarkdownContent(displayContent)} />
-                          </div>
-                        ) : (
+                        </div>
+                      ) : (
                           <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(displayContent)}</div>
                         )
                       )

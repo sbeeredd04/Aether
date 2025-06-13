@@ -229,13 +229,18 @@ export default function WorkspacePage() {
 
   const handleStreamingMessage = (messageChunk: string) => {
     console.log('🔄 Workspace: Message chunk received', { length: messageChunk.length });
-    setStreamingState(prev => ({
-      ...prev,
-      currentMessage: prev.currentMessage + messageChunk,
-      messagePhase: true,
-      isThinkingPhase: false,
-      thoughtEndTime: prev.thoughtEndTime || (prev.isThinkingPhase ? Date.now() : prev.thoughtEndTime)
-    }));
+    setStreamingState(prev => {
+      // Capture end time if this is the first message chunk (thinking just ended)
+      const shouldCaptureEndTime = prev.isThinkingPhase && !prev.thoughtEndTime;
+      
+      return {
+        ...prev,
+        currentMessage: prev.currentMessage + messageChunk,
+        messagePhase: true,
+        isThinkingPhase: false,
+        thoughtEndTime: shouldCaptureEndTime ? Date.now() : prev.thoughtEndTime
+      };
+    });
   };
 
   const handleStreamingComplete = () => {
@@ -247,6 +252,7 @@ export default function WorkspacePage() {
       isShowingThoughts: false,
       isThinkingPhase: false,
       messagePhase: false,
+      thoughtStartTime: prev.thoughtStartTime,
       thoughtEndTime: prev.thoughtEndTime || Date.now()
     }));
   };

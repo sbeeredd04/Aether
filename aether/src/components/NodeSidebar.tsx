@@ -326,9 +326,12 @@ export default function NodeSidebar({
       return Math.round(savedDuration / 1000);
     }
     
-    if (streamingState?.thoughtStartTime && streamingState?.thoughtEndTime) {
+    // Check if this is a streaming message that just completed
+    const isLastMessage = messageIndex === threadMessages.length - 1;
+    if (isLastMessage && streamingState?.thoughtStartTime && streamingState?.thoughtEndTime) {
       const duration = streamingState.thoughtEndTime - streamingState.thoughtStartTime;
       const seconds = Math.round(duration / 1000);
+      // Save the timing for this message
       setThoughtTimings(prev => new Map(prev).set(messageIndex, duration));
       return seconds;
     }
@@ -572,13 +575,11 @@ export default function NodeSidebar({
                                         <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:200ms]"></div>
                                         <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:400ms]"></div>
                                       </div>
+                                      <span className="flex-1">
+                                        {getThoughtTitle(streamingState.currentThoughts, true)}
+                                      </span>
                                     </>
-                                  ) : (
-                                    <span className="font-semibold text-blue-400">Thought:</span>
-                                  )}
-                                  <span className="flex-1">
-                                    {getThoughtTitle(streamingState.currentThoughts, true)}
-                                  </span>
+                                  ) : null}
                                 </div>
                                 {!streamingState.isThinkingPhase && (() => {
                                   const duration = getStreamingThoughtDuration();
@@ -620,7 +621,7 @@ export default function NodeSidebar({
                                   const duration = getThoughtDuration(idx);
                                   return (
                                     <div className="text-blue-400/90 flex items-center gap-1 leading-relaxed">
-                                      <span>Thought for {duration} second{duration !== 1 ? 's' : ''}</span>
+                                      <span>Thought for {duration}s</span>
                                       <span className="text-blue-400">●</span>
                                     </div>
                                   );

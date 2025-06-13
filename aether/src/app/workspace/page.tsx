@@ -16,6 +16,16 @@ import VoiceInputModal from '@/components/VoiceInputModal';
 import ImageModal from '@/components/ImageModal';
 import ModelInfoModal from '@/components/ModelInfoModal';
 
+// Streaming state interface for NodeSidebar
+interface StreamingState {
+  isStreaming: boolean;
+  currentThoughts: string;
+  currentMessage: string;
+  isShowingThoughts: boolean;
+  isThinkingPhase: boolean;
+  messagePhase: boolean;
+}
+
 export default function WorkspacePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(600);
@@ -24,6 +34,16 @@ export default function WorkspacePage() {
   const [showModelInfo, setShowModelInfo] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'canvas' | 'chat'>('canvas');
+  
+  // Streaming state management
+  const [streamingState, setStreamingState] = useState<StreamingState>({
+    isStreaming: false,
+    currentThoughts: '',
+    currentMessage: '',
+    isShowingThoughts: false,
+    isThinkingPhase: false,
+    messagePhase: false
+  });
   
   // Modal states
   const [showVoiceModal, setShowVoiceModal] = useState(false);
@@ -125,6 +145,15 @@ export default function WorkspacePage() {
   const handleReset = () => {
     if (activeNodeId) {
       resetNode(activeNodeId);
+      // Reset streaming state when resetting node
+      setStreamingState({
+        isStreaming: false,
+        currentThoughts: '',
+        currentMessage: '',
+        isShowingThoughts: false,
+        isThinkingPhase: false,
+        messagePhase: false
+      });
     }
   };
   
@@ -132,6 +161,15 @@ export default function WorkspacePage() {
     if (activeNodeId && activeNodeId !== 'root') {
       deleteNodeAndDescendants(activeNodeId);
       setIsSidebarOpen(false);
+      // Reset streaming state when deleting node
+      setStreamingState({
+        isStreaming: false,
+        currentThoughts: '',
+        currentMessage: '',
+        isShowingThoughts: false,
+        isThinkingPhase: false,
+        messagePhase: false
+      });
     }
   };
   
@@ -161,6 +199,63 @@ export default function WorkspacePage() {
   const handleCloseImageModal = () => {
     setShowImageModal(false);
     setSelectedImage(null);
+  };
+
+  // Streaming event handlers for PromptBar
+  const handleStreamingStart = () => {
+    console.log('🔄 Workspace: Streaming started');
+    setStreamingState({
+      isStreaming: true,
+      currentThoughts: '',
+      currentMessage: '',
+      isShowingThoughts: false,
+      isThinkingPhase: true,
+      messagePhase: false
+    });
+  };
+
+  const handleStreamingThought = (thought: string) => {
+    console.log('🔄 Workspace: Thought chunk received', { length: thought.length });
+    setStreamingState(prev => ({
+      ...prev,
+      currentThoughts: prev.currentThoughts + thought,
+      isThinkingPhase: true,
+      isShowingThoughts: true
+    }));
+  };
+
+  const handleStreamingMessage = (messageChunk: string) => {
+    console.log('🔄 Workspace: Message chunk received', { length: messageChunk.length });
+    setStreamingState(prev => ({
+      ...prev,
+      currentMessage: prev.currentMessage + messageChunk,
+      messagePhase: true,
+      isThinkingPhase: false
+    }));
+  };
+
+  const handleStreamingComplete = () => {
+    console.log('🔄 Workspace: Streaming complete');
+    setStreamingState({
+      isStreaming: false,
+      currentThoughts: '',
+      currentMessage: '',
+      isShowingThoughts: false,
+      isThinkingPhase: false,
+      messagePhase: false
+    });
+  };
+
+  const handleStreamingError = (error: string) => {
+    console.error('🔄 Workspace: Streaming error', { error });
+    setStreamingState({
+      isStreaming: false,
+      currentThoughts: '',
+      currentMessage: '',
+      isShowingThoughts: false,
+      isThinkingPhase: false,
+      messagePhase: false
+    });
   };
 
   // Mobile menu items
@@ -221,6 +316,7 @@ export default function WorkspacePage() {
                     width={sidebarWidth}
                     isActiveNodeLoading={isLoading}
                     onImageClick={handleImageClick}
+                    streamingState={streamingState}
                   />
                 </div>
               </div>
@@ -244,6 +340,11 @@ export default function WorkspacePage() {
               onShowImageModal={handleImageClick}
               voiceTranscript={voiceTranscript}
               onClearVoiceTranscript={clearVoiceTranscript}
+              onStreamingStart={handleStreamingStart}
+              onStreamingThought={handleStreamingThought}
+              onStreamingMessage={handleStreamingMessage}
+              onStreamingComplete={handleStreamingComplete}
+              onStreamingError={handleStreamingError}
             />
           </div>
 
@@ -386,6 +487,7 @@ export default function WorkspacePage() {
                   isActiveNodeLoading={isLoading}
                   onImageClick={handleImageClick}
                   isMobile={true}
+                  streamingState={streamingState}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-white/60 text-center p-8">
@@ -410,6 +512,11 @@ export default function WorkspacePage() {
               voiceTranscript={voiceTranscript}
               onClearVoiceTranscript={clearVoiceTranscript}
               isMobile={true}
+              onStreamingStart={handleStreamingStart}
+              onStreamingThought={handleStreamingThought}
+              onStreamingMessage={handleStreamingMessage}
+              onStreamingComplete={handleStreamingComplete}
+              onStreamingError={handleStreamingError}
             />
           </div>
         </div>

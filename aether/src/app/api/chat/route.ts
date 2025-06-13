@@ -1,4 +1,4 @@
-import { generateContent, GroundedTextResponse } from '@/utils/gemini';
+import { generateContent, generateContentStream, GroundedTextResponse } from '@/utils/gemini';
 import { executeGroundingPipeline, extractCitationsFromGrounding } from '@/utils/groundingPipeline';
 import serverLogger from '@/utils/serverLogger';
 import { NextRequest, NextResponse } from 'next/server';
@@ -7,79 +7,116 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
-  serverLogger.info('API: Chat request initiated', { requestId });
-
+  
   try {
-    // Parse request body
-    serverLogger.debug('API: Parsing request body', { requestId });
     const body = await req.json();
-    const { apiKey, modelId, history, prompt, attachments, ttsOptions, grounding, enableThinking, useGroundingPipeline } = body;
+    const { apiKey, modelId, history, prompt, attachments, ttsOptions, grounding, enableThinking, useGroundingPipeline, stream } = body;
     
-    serverLogger.info('API: Request parsed successfully', { 
+    // Default to streaming enabled if not specified
+    const useStreaming = stream !== undefined ? stream : true;
+    
+    serverLogger.info('API: Request received', { 
       requestId,
       modelId,
-      hasApiKey: !!apiKey,
-      hasPrompt: !!prompt,
       promptLength: prompt?.length || 0,
-      promptPreview: prompt ? prompt.substring(0, 100) + (prompt.length > 100 ? '...' : '') : null,
       historyLength: history?.length || 0,
       attachmentsCount: attachments?.length || 0,
-      hasTtsOptions: !!ttsOptions,
-      hasGrounding: !!grounding,
       enableThinking,
-      attachmentTypes: attachments?.map((att: any) => ({ type: att.type, name: att.name, dataLength: att.data?.length || 0 })) || []
+      useStreaming,
+      useGroundingPipeline: !!useGroundingPipeline
     });
 
     // Validate request
     if (!prompt && (!attachments || attachments.length === 0)) {
-      serverLogger.warn('API: Request validation failed - missing prompt and attachments', { requestId });
-      return NextResponse.json(
-        { error: 'Prompt or attachments are required' }, 
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Prompt or attachments are required' }, { status: 400 });
     }
     
     if (!apiKey) {
-      serverLogger.warn('API: Request validation failed - missing API key', { requestId });
-      return NextResponse.json(
-        { error: 'Gemini API key is required' }, 
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Gemini API key is required' }, { status: 400 });
     }
 
     if (!modelId) {
-      serverLogger.warn('API: Request validation failed - missing model ID', { requestId });
-      return NextResponse.json(
-        { error: 'Model ID is required' }, 
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Model ID is required' }, { status: 400 });
     }
 
-    // Process history
-    serverLogger.debug('API: Processing conversation history', { 
-      requestId,
-      historyEntries: history?.map((entry: any, index: number) => ({
-        index,
-        role: entry.role,
-        partsCount: entry.parts?.length || 0,
-        hasText: entry.parts?.some((p: any) => p.text),
-        hasInlineData: entry.parts?.some((p: any) => p.inlineData)
-      })) || []
-    });
-
     const startTime = Date.now();
+
+    // Handle streaming requests
+    if (useStreaming) {
+      serverLogger.info('🔄 API: Starting streaming response', { requestId, modelId });
+
+      const encoder = new TextEncoder();
+
+      const streamResponse = new ReadableStream({
+        async start(controller) {
+          try {
+            const streamGenerator = generateContentStream(
+              apiKey,
+              history,
+              prompt,
+              modelId,
+              attachments,
+              ttsOptions,
+              grounding,
+              enableThinking
+            );
+
+            let chunkCount = 0;
+            for await (const chunk of streamGenerator) {
+              chunkCount++;
+              
+              const streamData = {
+                type: chunk.type,
+                content: chunk.content,
+                ...(chunk.audioData && { audioData: chunk.audioData })
+              };
+
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify(streamData)}\n\n`)
+              );
+            }
+            
+            serverLogger.info('🔄 API: Streaming complete', { 
+              requestId,
+              totalDuration: `${Date.now() - startTime}ms`,
+              chunks: chunkCount
+            });
+            
+            controller.close();
+          } catch (error) {
+            serverLogger.error('🔄 API: Streaming failed', { 
+              requestId,
+              duration: `${Date.now() - startTime}ms`,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+            
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ 
+                type: 'error', 
+                content: error instanceof Error ? error.message : 'An unknown error occurred' 
+              })}\n\n`)
+            );
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(streamResponse, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    }
+
+    // Handle non-streaming requests
+    serverLogger.info('API: Non-streaming request', { requestId, modelId });
     let result: any;
 
     // Check if grounding pipeline should be used
     if (useGroundingPipeline && grounding?.enabled) {
-      serverLogger.info('API: Using grounding pipeline', { 
-        requestId,
-        modelId,
-        apiKeyLength: apiKey?.length || 0,
-        historyLength: history?.length || 0,
-        attachmentsCount: attachments?.length || 0,
-        enableThinking
-      });
+      serverLogger.info('API: Using grounding pipeline', { requestId });
 
       const groundingResult = await executeGroundingPipeline(
         apiKey,
@@ -98,15 +135,6 @@ export async function POST(req: NextRequest) {
         }
       };
     } else {
-      serverLogger.info('API: Calling generateContent', { 
-        requestId,
-        modelId,
-        apiKeyLength: apiKey?.length || 0,
-        historyLength: history?.length || 0,
-        attachmentsCount: attachments?.length || 0
-      });
-
-      // Call generateContent
       result = await generateContent(
         apiKey,
         history,
@@ -119,11 +147,9 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const duration = Date.now() - startTime;
-    
-    serverLogger.info('API: generateContent completed', { 
+    serverLogger.info('API: Non-streaming complete', { 
       requestId,
-      duration: `${duration}ms`,
+      duration: `${Date.now() - startTime}ms`,
       resultType: 'text' in result ? 'text' : 
                   'audioBase64' in result ? 'audio' : 
                   'images' in result ? 'images' : 'unknown',
@@ -132,46 +158,14 @@ export async function POST(req: NextRequest) {
                   'images' in result ? result.images.length : 0
     });
 
-    // Analyze result
-    if ('text' in result) {
-      serverLogger.debug('API: Processing text result', { 
-        requestId,
-        textLength: result.text.length,
-        textPreview: result.text.substring(0, 100) + (result.text.length > 100 ? '...' : '')
-      });
-    } else if ('audioBase64' in result) {
-      serverLogger.debug('API: Processing audio result', { 
-        requestId,
-        mimeType: result.mimeType,
-        audioDataLength: result.audioBase64.length
-      });
-    } else if ('images' in result) {
-      serverLogger.debug('API: Processing images result', { 
-        requestId,
-        imageCount: result.images.length,
-        images: result.images.map((img: any, idx: number) => ({
-          index: idx,
-          mimeType: img.mimeType,
-          dataLength: img.data.length
-        }))
-      });
-    }
-    
-    // Branch on response type and prepare response
+    // Prepare response
     let response;
     if ('text' in result) {
-      // Check if this is a grounded response
       const groundedResult = result as GroundedTextResponse;
       response = { 
         text: groundedResult.text,
         ...(groundedResult.groundingMetadata && { groundingMetadata: groundedResult.groundingMetadata })
       };
-      serverLogger.info('API: Returning text response', { 
-        requestId,
-        responseType: 'text',
-        textLength: groundedResult.text.length,
-        hasGroundingMetadata: !!groundedResult.groundingMetadata
-      });
     } else if ('audioBase64' in result) {
       response = { 
         audio: { 
@@ -179,46 +173,18 @@ export async function POST(req: NextRequest) {
           mimeType: result.mimeType 
         } 
       };
-      serverLogger.info('API: Returning audio response', { 
-        requestId,
-        responseType: 'audio',
-        mimeType: result.mimeType,
-        dataLength: result.audioBase64.length
-      });
     } else if ('images' in result) {
       response = { images: result.images };
-      serverLogger.info('API: Returning images response', { 
-        requestId,
-        responseType: 'images',
-        imageCount: result.images.length,
-        totalDataSize: result.images.reduce((sum: number, img: any) => sum + img.data.length, 0)
-      });
     } else {
-      serverLogger.error('API: Unknown result type from generateContent', { 
-        requestId,
-        resultKeys: Object.keys(result)
-      });
       throw new Error('Unknown response type from generateContent');
     }
-
-    serverLogger.info('API: Request completed successfully', { 
-      requestId,
-      totalDuration: `${Date.now() - startTime}ms`,
-      responseType: Object.keys(response)[0]
-    });
 
     return NextResponse.json(response);
     
   } catch (error) {
-    const duration = Date.now();
     serverLogger.error('API: Request failed', { 
       requestId,
-      error: error instanceof Error ? {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      } : error,
-      duration: `${duration}ms`
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
 
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';

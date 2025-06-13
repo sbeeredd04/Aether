@@ -3,30 +3,29 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FiX, FiSave, FiAlertTriangle, FiExternalLink } from 'react-icons/fi';
+import { FiX, FiSave, FiAlertTriangle, FiExternalLink, FiZap } from 'react-icons/fi';
 import logger from '@/utils/logger';
+import { loadSettings, saveSettings, AppSettings } from '@/utils/settings';
 
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const SETTINGS_KEY = 'aether-settings';
-
 export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [apiKey, setApiKey] = useState('');
+  const [streamingEnabled, setStreamingEnabled] = useState(true); // Default to enabled
 
-  // Load saved API key on mount
+  // Load saved settings on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(SETTINGS_KEY);
-      if (saved) {
-        const settings = JSON.parse(saved);
-        if (settings.apiKey) {
-          setApiKey(settings.apiKey);
-          logger.info('Loaded API key from localStorage.');
-        }
-      }
+      const settings = loadSettings();
+      setApiKey(settings.apiKey);
+      setStreamingEnabled(settings.streamingEnabled);
+      logger.info('Loaded settings from localStorage.', { 
+        hasApiKey: !!settings.apiKey,
+        streamingEnabled: settings.streamingEnabled 
+      });
     } catch (error) {
       logger.error('Failed to load settings from localStorage', { error });
     }
@@ -34,9 +33,15 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   const handleSave = () => {
     try {
-      const settings = { apiKey };
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-      logger.info('Saved API key to localStorage.');
+      const settings: AppSettings = { 
+        apiKey,
+        streamingEnabled
+      };
+      saveSettings(settings);
+      logger.info('Saved settings to localStorage.', { 
+        hasApiKey: !!apiKey,
+        streamingEnabled 
+      });
       onClose();
     } catch (error) {
       logger.error('Failed to save settings to localStorage', { error });
@@ -83,10 +88,44 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             </a>
           </div>
 
+          {/* Streaming Responses Setting */}
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FiZap className="h-5 w-5 text-yellow-300" />
+                <label htmlFor="streaming" className="text-sm font-medium">
+                  Streaming Responses
+                </label>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={streamingEnabled}
+                onClick={() => setStreamingEnabled(!streamingEnabled)}
+                className={`${
+                  streamingEnabled ? 'bg-blue-600' : 'bg-gray-600'
+                } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-black`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`${
+                    streamingEnabled ? 'translate-x-5' : 'translate-x-0'
+                  } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                />
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-gray-300">
+              {streamingEnabled 
+                ? 'Responses will stream in real-time as they are generated'
+                : 'Responses will be sent as complete messages'
+              }
+            </p>
+          </div>
+
           <div className="p-3 bg-black/30 rounded-xl flex items-start space-x-3">
             <FiAlertTriangle className="h-5 w-5 text-yellow-300 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-yellow-200">
-              Your API key is stored in your browser's local storage. Do not use this application on
+              Your settings are stored in your browser's local storage. Do not use this application on
               a shared or public computer.
             </p>
           </div>

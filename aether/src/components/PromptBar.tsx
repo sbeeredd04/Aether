@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSearch, FiVolume2, FiUpload } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSearch, FiVolume2, FiUpload, FiFileText, FiCpu, FiGlobe, FiSquare } from 'react-icons/fi';
 import { FaStop } from "react-icons/fa";
 import { IoOptionsOutline } from "react-icons/io5";
 import { LuBrain } from "react-icons/lu";
 import { TbBrandGoogle } from "react-icons/tb";
 import { useChatStore } from '../store/chatStore';
 import { models, getTTSVoices, getModelById } from '../utils/models';
+import { isStreamingEnabled } from '../utils/settings';
 import logger from '../utils/logger';
 
 interface PromptBarProps {
@@ -17,6 +18,12 @@ interface PromptBarProps {
   voiceTranscript?: string;
   onClearVoiceTranscript?: () => void;
   isMobile?: boolean;
+  // Streaming callbacks
+  onStreamingStart?: () => void;
+  onStreamingThought?: (thought: string) => void;
+  onStreamingMessage?: (messageChunk: string) => void;
+  onStreamingComplete?: () => void;
+  onStreamingError?: (error: string) => void;
 }
 
 interface Attachment {
@@ -42,7 +49,12 @@ export default function PromptBar({
   onShowImageModal,
   voiceTranscript,
   onClearVoiceTranscript,
-  isMobile = false
+  isMobile = false,
+  onStreamingStart,
+  onStreamingThought,
+  onStreamingMessage,
+  onStreamingComplete,
+  onStreamingError
 }: PromptBarProps) {
   // Early return check BEFORE any hooks
   if (!node) {
@@ -422,6 +434,10 @@ export default function PromptBar({
         throw new Error('API key is empty.');
       }
 
+      // Check streaming preference
+      const streamingEnabled = isStreamingEnabled();
+      logger.info('PromptBar: Streaming preference', { streamingEnabled });
+
       logger.info('PromptBar: Making API request', {
         endpoint: '/api/chat',
         modelId: selectedModel,
@@ -430,7 +446,8 @@ export default function PromptBar({
         historyLength: history.length,
         enableThinking: supportsThinking ? enableThinking : undefined,
         groundingEnabled: supportsGrounding ? grounding.enabled : undefined,
-        hasTtsOptions: isTTSModel && (!!ttsOptions.voiceName || !!ttsOptions.multiSpeaker)
+        hasTtsOptions: isTTSModel && (!!ttsOptions.voiceName || !!ttsOptions.multiSpeaker),
+        streamingEnabled
       });
 
       // Prepare request payload
@@ -440,6 +457,7 @@ export default function PromptBar({
         history,
         prompt: input,
         attachments: attachmentData,
+        stream: streamingEnabled, // Add streaming preference
       };
 
       // Add model-specific options
@@ -474,7 +492,8 @@ export default function PromptBar({
       logger.info('PromptBar: API response received', { 
         status: response.status,
         statusText: response.statusText,
-        ok: response.ok 
+        ok: response.ok,
+        isStreaming: streamingEnabled
       });
 
       if (!response.ok) {
@@ -485,97 +504,242 @@ export default function PromptBar({
         throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
-      logger.info('PromptBar: API response data received', { 
-        hasText: !!data.text,
-        hasAudio: !!data.audio,
-        hasImages: !!data.images,
-        hasError: !!data.error,
-        imageCount: data.images?.length || 0
-      });
-      
-      // Handle different response types
-      if (data.text) {
-        logger.info('PromptBar: Processing text response', { 
-          responseLength: data.text.length,
-          preview: data.text.substring(0, 100) + (data.text.length > 100 ? '...' : ''),
-          hasGroundingMetadata: !!data.groundingMetadata
-        });
+      // Handle streaming vs non-streaming responses
+      if (streamingEnabled) {
+        logger.info('PromptBar: Processing streaming response');
         
-        const modelMessage: any = { 
+        if (!response.body) {
+          throw new Error('No response body for streaming');
+        }
+
+        // Notify that streaming started
+        onStreamingStart?.();
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        let fullMessage = '';
+        let fullThoughts = '';
+        let audioData: string | undefined;
+
+        // Create placeholder message for streaming updates
+        const placeholderMessage = { 
           role: 'model' as const, 
-          content: data.text,
+          content: '',
           modelId: selectedModel
         };
-        
-        // Add grounding metadata if present
-        if (data.groundingMetadata) {
-          modelMessage.groundingMetadata = data.groundingMetadata;
-          logger.debug('PromptBar: Added grounding metadata to message', {
-            hasSearchQueries: !!data.groundingMetadata.webSearchQueries,
-            searchQueriesCount: data.groundingMetadata.webSearchQueries?.length || 0,
-            hasCitations: !!data.groundingMetadata.citations,
-            citationsCount: data.groundingMetadata.citations?.length || 0,
-            hasSearchEntryPoint: !!data.groundingMetadata.searchEntryPoint
-          });
+        addMessageToNode(node.id, placeholderMessage, false);
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              logger.info('PromptBar: Streaming complete');
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  
+                  switch (data.type) {
+                    case 'thought':
+                      fullThoughts += data.content;
+                      logger.debug('PromptBar: Received thought chunk', { length: data.content.length });
+                      onStreamingThought?.(data.content);
+                      break;
+                      
+                    case 'message':
+                      fullMessage += data.content;
+                      logger.debug('PromptBar: Received message chunk', { length: data.content.length });
+                      onStreamingMessage?.(data.content);
+                      
+                      // Update the last message with accumulated content
+                      const finalContent = fullThoughts ? 
+                        `**Thoughts:**\n${fullThoughts}\n\n---\n\n**Answer:**\n${fullMessage}` : 
+                        fullMessage;
+                      
+                      // Update the placeholder message
+                      const { nodes } = useChatStore.getState();
+                      const currentNode = nodes.find(n => n.id === node.id);
+                      if (currentNode && currentNode.data.chatHistory.length > 0) {
+                        const lastMessage = currentNode.data.chatHistory[currentNode.data.chatHistory.length - 1];
+                        if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
+                          lastMessage.content = finalContent;
+                          // Trigger re-render
+                          useChatStore.setState({ nodes: [...nodes] });
+                        }
+                      }
+                      break;
+                      
+                    case 'complete':
+                      if (data.audioData) {
+                        audioData = data.audioData;
+                        logger.info('PromptBar: Received audio data', { length: data.audioData.length });
+                      }
+                      logger.info('PromptBar: Streaming response complete', { 
+                        messageLength: fullMessage.length,
+                        thoughtsLength: fullThoughts.length,
+                        hasAudio: !!audioData
+                      });
+                      onStreamingComplete?.();
+                      break;
+                      
+                    case 'error':
+                      logger.error('PromptBar: Streaming error', { error: data.content });
+                      onStreamingError?.(data.content);
+                      throw new Error(data.content);
+                      
+                    default:
+                      logger.warn('PromptBar: Unknown chunk type', { type: data.type });
+                  }
+                } catch (e) {
+                  logger.warn('PromptBar: Failed to parse chunk', { line });
+                }
+              }
+            }
+          }
+
+          // Final update with complete message and audio if available
+          const finalContent = fullThoughts ? 
+            `**Thoughts:**\n${fullThoughts}\n\n---\n\n**Answer:**\n${fullMessage}` : 
+            fullMessage;
+
+          const finalMessage: any = { 
+            role: 'model' as const, 
+            content: finalContent,
+            modelId: selectedModel
+          };
+
+          if (audioData) {
+            finalMessage.attachments = [{
+              name: 'audio_response.wav',
+              type: 'audio/wav',
+              data: audioData,
+              previewUrl: `data:audio/wav;base64,${audioData}`
+            }];
+          }
+
+          // Replace the placeholder with final message
+          const { nodes } = useChatStore.getState();
+          const currentNode = nodes.find(n => n.id === node.id);
+          if (currentNode && currentNode.data.chatHistory.length > 0) {
+            const lastMessage = currentNode.data.chatHistory[currentNode.data.chatHistory.length - 1];
+            if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
+              Object.assign(lastMessage, finalMessage);
+              useChatStore.setState({ nodes: [...nodes] });
+            }
+          }
+
+        } catch (streamingError) {
+          logger.error('PromptBar: Streaming failed', { error: streamingError });
+          onStreamingError?.(streamingError instanceof Error ? streamingError.message : 'Streaming failed');
+          throw streamingError;
+        } finally {
+          reader.releaseLock();
         }
-        
-        addMessageToNode(node.id, modelMessage, false);
-        logger.debug('PromptBar: Text response added to node');
-        
-      } else if (data.audio) {
-        logger.info('PromptBar: Processing audio response', { 
-          mimeType: data.audio.mimeType,
-          dataLength: data.audio.data?.length || 0
-        });
-        
-        const modelMessage = { 
-          role: 'model' as const, 
-          content: '[Audio Response]',
-          modelId: selectedModel,
-          attachments: [{
-            name: 'audio_response.wav',
-            type: data.audio.mimeType || 'audio/wav',
-            data: data.audio.data,
-            previewUrl: `data:${data.audio.mimeType || 'audio/wav'};base64,${data.audio.data}`
-          }]
-        };
-        addMessageToNode(node.id, modelMessage, false);
-        logger.debug('PromptBar: Audio response added to node');
-        
-      } else if (data.images && data.images.length > 0) {
-        logger.info('PromptBar: Processing image response', { 
-          imageCount: data.images.length,
-          images: data.images.map((img: any, idx: number) => ({
-            index: idx,
-            mimeType: img.mimeType,
-            dataLength: img.data?.length || 0
-          }))
-        });
-        
-        const imageAttachments = data.images.map((img: any, idx: number) => ({
-          name: `generated_image_${idx + 1}.png`,
-          type: img.mimeType || 'image/png',
-          data: img.data,
-          previewUrl: `data:${img.mimeType || 'image/png'};base64,${img.data}`
-        }));
-        
-        const modelMessage = { 
-          role: 'model' as const, 
-          content: '[Generated Images]',
-          modelId: selectedModel,
-          attachments: imageAttachments
-        };
-        addMessageToNode(node.id, modelMessage, false);
-        logger.debug('PromptBar: Image response added to node');
-        
-      } else if (data.error) {
-        logger.error('PromptBar: API returned error', { error: data.error });
-        addMessageToNode(node.id, { role: 'model', content: `Error: ${data.error}`, modelId: selectedModel });
-        
+
       } else {
-        logger.warn('PromptBar: Unknown response format', { responseKeys: Object.keys(data) });
-        addMessageToNode(node.id, { role: 'model', content: 'Error: Unknown response format from server', modelId: selectedModel });
+        // Handle non-streaming response (existing logic)
+        logger.info('PromptBar: Processing non-streaming response');
+        
+        const data = await response.json();
+        logger.info('PromptBar: API response data received', { 
+          hasText: !!data.text,
+          hasAudio: !!data.audio,
+          hasImages: !!data.images,
+          hasError: !!data.error,
+          imageCount: data.images?.length || 0
+        });
+        
+        // Handle different response types (existing logic)
+        if (data.text) {
+          logger.info('PromptBar: Processing text response', { 
+            responseLength: data.text.length,
+            preview: data.text.substring(0, 100) + (data.text.length > 100 ? '...' : ''),
+            hasGroundingMetadata: !!data.groundingMetadata
+          });
+          
+          const modelMessage: any = { 
+            role: 'model' as const, 
+            content: data.text,
+            modelId: selectedModel
+          };
+          
+          // Add grounding metadata if present
+          if (data.groundingMetadata) {
+            modelMessage.groundingMetadata = data.groundingMetadata;
+            logger.debug('PromptBar: Added grounding metadata to message', {
+              hasSearchQueries: !!data.groundingMetadata.webSearchQueries,
+              searchQueriesCount: data.groundingMetadata.webSearchQueries?.length || 0,
+              hasCitations: !!data.groundingMetadata.citations,
+              citationsCount: data.groundingMetadata.citations?.length || 0,
+              hasSearchEntryPoint: !!data.groundingMetadata.searchEntryPoint
+            });
+          }
+          
+          addMessageToNode(node.id, modelMessage, false);
+          logger.debug('PromptBar: Text response added to node');
+          
+        } else if (data.audio) {
+          logger.info('PromptBar: Processing audio response', { 
+            mimeType: data.audio.mimeType,
+            dataLength: data.audio.data?.length || 0
+          });
+          
+          const modelMessage = { 
+            role: 'model' as const, 
+            content: '[Audio Response]',
+            modelId: selectedModel,
+            attachments: [{
+              name: 'audio_response.wav',
+              type: data.audio.mimeType || 'audio/wav',
+              data: data.audio.data,
+              previewUrl: `data:${data.audio.mimeType || 'audio/wav'};base64,${data.audio.data}`
+            }]
+          };
+          addMessageToNode(node.id, modelMessage, false);
+          logger.debug('PromptBar: Audio response added to node');
+          
+        } else if (data.images && data.images.length > 0) {
+          logger.info('PromptBar: Processing image response', { 
+            imageCount: data.images.length,
+            images: data.images.map((img: any, idx: number) => ({
+              index: idx,
+              mimeType: img.mimeType,
+              dataLength: img.data?.length || 0
+            }))
+          });
+          
+          const imageAttachments = data.images.map((img: any, idx: number) => ({
+            name: `generated_image_${idx + 1}.png`,
+            type: img.mimeType || 'image/png',
+            data: img.data,
+            previewUrl: `data:${img.mimeType || 'image/png'};base64,${img.data}`
+          }));
+          
+          const modelMessage = { 
+            role: 'model' as const, 
+            content: '[Generated Images]',
+            modelId: selectedModel,
+            attachments: imageAttachments
+          };
+          addMessageToNode(node.id, modelMessage, false);
+          logger.debug('PromptBar: Image response added to node');
+          
+        } else if (data.error) {
+          logger.error('PromptBar: API returned error', { error: data.error });
+          addMessageToNode(node.id, { role: 'model', content: `Error: ${data.error}`, modelId: selectedModel });
+          
+        } else {
+          logger.warn('PromptBar: Unknown response format', { responseKeys: Object.keys(data) });
+          addMessageToNode(node.id, { role: 'model', content: 'Error: Unknown response format from server', modelId: selectedModel });
+        }
       }
 
       logger.info('PromptBar: Request completed successfully');

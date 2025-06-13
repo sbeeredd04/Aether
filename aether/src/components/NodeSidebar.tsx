@@ -10,6 +10,15 @@ import Citations from './Citations';
 import CopyButton from './CopyButton';
 import logger from '../utils/logger';
 
+interface StreamingState {
+  isStreaming: boolean;
+  currentThoughts: string;
+  currentMessage: string;
+  isShowingThoughts: boolean;
+  isThinkingPhase: boolean;
+  messagePhase: boolean;
+}
+
 interface NodeSidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,6 +32,7 @@ interface NodeSidebarProps {
   isActiveNodeLoading?: boolean;
   onImageClick?: (imageSrc: string, imageTitle: string) => void;
   isMobile?: boolean;
+  streamingState?: StreamingState;
 }
 
 export default function NodeSidebar({
@@ -37,7 +47,8 @@ export default function NodeSidebar({
   width = 384,
   isActiveNodeLoading = false,
   onImageClick,
-  isMobile = false
+  isMobile = false,
+  streamingState
 }: NodeSidebarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { getPathToNode, nodes, edges } = useChatStore();
@@ -53,7 +64,8 @@ export default function NodeSidebar({
     threadMessagesCount: threadMessages.length,
     isActiveNodeLoading,
     width,
-    isMobile
+    isMobile,
+    streamingState
   });
   
   function getFullConversationThread(targetNodeId: string): ChatMessage[] {
@@ -109,12 +121,12 @@ export default function NodeSidebar({
     return path;
   }
   
-  // Auto-scroll to bottom when messages change or loading
+  // Auto-scroll to bottom when messages change or streaming state changes
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [threadMessages.length]);
+  }, [threadMessages.length, streamingState?.currentThoughts, streamingState?.currentMessage]);
 
   // Parse thoughts from model response
   const parseThoughts = (content: string) => {
@@ -162,6 +174,8 @@ export default function NodeSidebar({
       .trim();
   };
 
+
+
   if (!isOpen || !data) return null;
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
@@ -190,6 +204,40 @@ export default function NodeSidebar({
       <span className="bg-white/40 rounded-full w-2 h-2 animate-bounce [animation-delay:300ms]"></span>
     </span>
   );
+
+  // Streaming thoughts component
+  const StreamingThoughts = ({ content }: { content: string }) => {
+    if (!content) return null;
+    
+    return (
+      <div className={`mt-2 ${isMobile ? 'p-2' : 'p-3'} bg-black/20 rounded-lg border border-blue-500/20`}>
+        <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-blue-300 mb-2 font-space-grotesk flex items-center gap-2`}>
+          <span>Thinking...</span>
+          <div className="flex gap-1">
+            <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
+            <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse [animation-delay:200ms]"></div>
+            <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse [animation-delay:400ms]"></div>
+          </div>
+        </div>
+        <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white/80 font-space-grotesk relative`}>
+          <span className="whitespace-pre-wrap">{content}</span>
+          <span className="inline-block w-[2px] h-4 bg-white animate-pulse ml-1"></span>
+        </div>
+      </div>
+    );
+  };
+
+  // Streaming message component
+  const StreamingMessage = ({ content }: { content: string }) => {
+    if (!content) return null;
+    
+    return (
+      <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white font-space-grotesk relative`}>
+        <span className="whitespace-pre-wrap">{content}</span>
+        <span className="inline-block w-[2px] h-4 bg-white animate-pulse ml-1"></span>
+      </div>
+    );
+  };
 
   return (
     <div 
@@ -393,21 +441,54 @@ export default function NodeSidebar({
           ) : (
             <div className={`text-center text-gray-400 ${isMobile ? 'py-6' : 'py-8'} font-space-grotesk`}>No messages in this conversation yet</div>
           )}
-          {/* Loading animation for current node */}
-          {isActiveNodeLoading && (
+          
+          {/* Streaming content - only show when actively streaming */}
+          {(streamingState?.isStreaming || isActiveNodeLoading) && (
             <div className="flex justify-start">
               <div className={`${isMobile ? 'max-w-[90%]' : 'max-w-[80%]'} ${
                 isMobile ? 'px-3 py-2' : 'px-4 py-3'
-              } rounded-2xl shadow-md bg-white/5 backdrop-blur-sm border border-white/10 flex items-center gap-2`}>
-                <div className="relative">
-                  <span className={`absolute ${isMobile ? '-top-4 -left-4' : '-top-5 -left-5'}`}>
-                    <SiGooglegemini size={isMobile ? 18 : 22} className="text-blue-300 drop-shadow-md" title={getModelName()} />
-                  </span>
+              } rounded-2xl shadow-md bg-white/5 backdrop-blur-sm border border-white/10 relative`}>
+                
+                {/* Gemini icon */}
+                <div className={`absolute ${isMobile ? '-top-4 -left-4' : '-top-5 -left-5'} flex items-center`}>
+                  <SiGooglegemini size={isMobile ? 18 : 22} className="text-blue-300 drop-shadow-md" />
                 </div>
-                <LoadingDots />
+                
+                {/* Header */}
+                <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-gray-300/80 mb-2 font-space-grotesk`}>
+                  {getModelName()}
+                </div>
+                
+                {/* Streaming states */}
+                {streamingState?.isStreaming ? (
+                  <div className="space-y-2">
+                    {/* Show thoughts if in thinking phase */}
+                    {(streamingState.isThinkingPhase || streamingState.currentThoughts) && (
+                      <StreamingThoughts content={streamingState.currentThoughts} />
+                    )}
+                    
+                    {/* Show message content if in message phase */}
+                    {(streamingState.messagePhase || streamingState.currentMessage) && (
+                      <StreamingMessage content={streamingState.currentMessage} />
+                    )}
+                    
+                    {/* If no content yet, show loading dots */}
+                    {!streamingState.currentThoughts && !streamingState.currentMessage && (
+                      <div className="flex items-center gap-2">
+                        <LoadingDots />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Fallback loading state */
+                  <div className="flex items-center gap-2">
+                    <LoadingDots />
+                  </div>
+                )}
               </div>
             </div>
           )}
+          
           {/* Bottom margin for conversation */}
           <div className={isMobile ? 'h-6' : 'h-8'}></div>
         </div>

@@ -20,7 +20,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   useEffect(() => {
     try {
       const settings = loadSettings();
-      setApiKey(settings.apiKey);
+          setApiKey(settings.apiKey);
       setStreamingEnabled(settings.streamingEnabled);
       logger.info('Loaded settings from localStorage.', { 
         hasApiKey: !!settings.apiKey,

@@ -156,6 +156,8 @@ export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => 
 
 // A simple function to check if content has markdown
 export const hasMarkdown = (content: string): boolean => {
+  if (!content || typeof content !== 'string') return false;
+  
   const markdownPatterns = [
     /```[\s\S]*?```/,         // Code blocks
     /\[.*?\]\(.*?\)/,         // Links
@@ -168,7 +170,12 @@ export const hasMarkdown = (content: string): boolean => {
     /!\[.*?\]\(.*?\)/,        // Images
     /\|.+\|.+\|/,             // Tables
     /^---$/m,                 // Horizontal rules
-    /`[^`]+`/                 // Inline code
+    /`[^`]+`/,                // Inline code
+    // Additional patterns for streaming content
+    /\*\*[^*]*$/,             // Incomplete bold (streaming)
+    /\*[^*]*$/,               // Incomplete italic (streaming)  
+    /```[^`]*$/,              // Incomplete code block (streaming)
+    /^#+\s*$/m,               // Header markers only (streaming)
   ];
 
   return markdownPatterns.some(pattern => pattern.test(content));

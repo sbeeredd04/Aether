@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
-  
+
   try {
     const body = await req.json();
     const { apiKey, modelId, history, prompt, attachments, ttsOptions, grounding, enableThinking, useGroundingPipeline, stream } = body;
@@ -74,6 +74,11 @@ export async function POST(req: NextRequest) {
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify(streamData)}\n\n`)
               );
+              
+              // Add a small delay to prevent overwhelming the client
+              if (chunkCount % 10 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 1));
+              }
             }
             
             serverLogger.info('🔄 API: Streaming complete', { 

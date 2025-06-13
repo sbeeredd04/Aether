@@ -552,6 +552,21 @@ export default function PromptBar({
                       fullThoughts += data.content;
                       logger.debug('PromptBar: Received thought chunk', { length: data.content.length });
                       onStreamingThought?.(data.content);
+                      
+                      // Update the placeholder message with thoughts
+                      const { nodes } = useChatStore.getState();
+                      const currentNode = nodes.find(n => n.id === node.id);
+                      if (currentNode && currentNode.data.chatHistory.length > 0) {
+                        const lastMessage = currentNode.data.chatHistory[currentNode.data.chatHistory.length - 1];
+                        if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
+                          const currentContent = fullThoughts ? 
+                            `**Thoughts:**\n${fullThoughts}${fullMessage ? `\n\n---\n\n**Answer:**\n${fullMessage}` : ''}` : 
+                            fullMessage;
+                          lastMessage.content = currentContent;
+                          // Trigger re-render
+                          useChatStore.setState({ nodes: [...nodes] });
+                        }
+                      }
                       break;
                       
                     case 'message':
@@ -559,20 +574,18 @@ export default function PromptBar({
                       logger.debug('PromptBar: Received message chunk', { length: data.content.length });
                       onStreamingMessage?.(data.content);
                       
-                      // Update the last message with accumulated content
-                      const finalContent = fullThoughts ? 
-                        `**Thoughts:**\n${fullThoughts}\n\n---\n\n**Answer:**\n${fullMessage}` : 
-                        fullMessage;
-                      
-                      // Update the placeholder message
-                      const { nodes } = useChatStore.getState();
-                      const currentNode = nodes.find(n => n.id === node.id);
-                      if (currentNode && currentNode.data.chatHistory.length > 0) {
-                        const lastMessage = currentNode.data.chatHistory[currentNode.data.chatHistory.length - 1];
+                      // Update the placeholder message with accumulated content
+                      const { nodes: messageNodes } = useChatStore.getState();
+                      const messageCurrentNode = messageNodes.find(n => n.id === node.id);
+                      if (messageCurrentNode && messageCurrentNode.data.chatHistory.length > 0) {
+                        const lastMessage = messageCurrentNode.data.chatHistory[messageCurrentNode.data.chatHistory.length - 1];
                         if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
-                          lastMessage.content = finalContent;
+                          const currentContent = fullThoughts ? 
+                            `**Thoughts:**\n${fullThoughts}\n\n---\n\n**Answer:**\n${fullMessage}` : 
+                            fullMessage;
+                          lastMessage.content = currentContent;
                           // Trigger re-render
-                          useChatStore.setState({ nodes: [...nodes] });
+                          useChatStore.setState({ nodes: [...messageNodes] });
                         }
                       }
                       break;

@@ -174,7 +174,66 @@ export default function NodeSidebar({
       .trim();
   };
 
+  // Check if this is a streaming message (empty or actively being updated)
+  const isStreamingMessage = (msg: ChatMessage, index: number) => {
+    const isLastMessage = index === threadMessages.length - 1;
+    const isModelMessage = msg.role === 'model';
+    const isEmpty = !msg.content || msg.content.trim() === '';
+    
+    return isLastMessage && isModelMessage && (isEmpty || streamingState?.isStreaming);
+  };
 
+  // Get streaming content for rendering
+  const getStreamingContent = () => {
+    if (!streamingState?.isStreaming) return '';
+    
+    let content = '';
+    if (streamingState.currentThoughts) {
+      content += `**Thoughts:**\n${streamingState.currentThoughts}`;
+      if (streamingState.currentMessage) {
+        content += `\n\n---\n\n**Answer:**\n${streamingState.currentMessage}`;
+      }
+    } else if (streamingState.currentMessage) {
+      content = streamingState.currentMessage;
+    }
+    
+    return content;
+  };
+
+  // Loading dots animation
+  const LoadingDots = () => (
+    <span className="flex gap-1 items-center h-6">
+      <span className="bg-white/80 rounded-full w-2 h-2 animate-bounce [animation-delay:0ms]"></span>
+      <span className="bg-white/60 rounded-full w-2 h-2 animate-bounce [animation-delay:150ms]"></span>
+      <span className="bg-white/40 rounded-full w-2 h-2 animate-bounce [animation-delay:300ms]"></span>
+    </span>
+  );
+
+  // Streaming message component with cursor
+  const StreamingContent = ({ content }: { content: string }) => {
+    if (!content) {
+      return (
+        <div className="flex items-center gap-2">
+          <LoadingDots />
+        </div>
+      );
+    }
+    
+    const hasMarkdownSyntax = hasMarkdown(content);
+    
+    return (
+      <div className="relative">
+        {hasMarkdownSyntax ? (
+          <div className="markdown-content font-space-grotesk">
+            <MarkdownRenderer content={cleanMarkdownContent(content)} />
+          </div>
+        ) : (
+          <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(content)}</div>
+        )}
+        <span className="inline-block w-[2px] h-4 bg-white animate-pulse ml-1"></span>
+      </div>
+    );
+  };
 
   if (!isOpen || !data) return null;
 
@@ -195,49 +254,6 @@ export default function NodeSidebar({
   };
   
   const isGeminiModel = (modelId?: string) => (modelId || 'gemini-2.0-flash').toLowerCase().includes('gemini');
-
-  // Loading dots animation
-  const LoadingDots = () => (
-    <span className="flex gap-1 items-center h-6">
-      <span className="bg-white/80 rounded-full w-2 h-2 animate-bounce [animation-delay:0ms]"></span>
-      <span className="bg-white/60 rounded-full w-2 h-2 animate-bounce [animation-delay:150ms]"></span>
-      <span className="bg-white/40 rounded-full w-2 h-2 animate-bounce [animation-delay:300ms]"></span>
-    </span>
-  );
-
-  // Streaming thoughts component
-  const StreamingThoughts = ({ content }: { content: string }) => {
-    if (!content) return null;
-    
-    return (
-      <div className={`mt-2 ${isMobile ? 'p-2' : 'p-3'} bg-black/20 rounded-lg border border-blue-500/20`}>
-        <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-blue-300 mb-2 font-space-grotesk flex items-center gap-2`}>
-          <span>Thinking...</span>
-          <div className="flex gap-1">
-            <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
-            <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse [animation-delay:200ms]"></div>
-            <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse [animation-delay:400ms]"></div>
-          </div>
-        </div>
-        <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white/80 font-space-grotesk relative`}>
-          <span className="whitespace-pre-wrap">{content}</span>
-          <span className="inline-block w-[2px] h-4 bg-white animate-pulse ml-1"></span>
-        </div>
-      </div>
-    );
-  };
-
-  // Streaming message component
-  const StreamingMessage = ({ content }: { content: string }) => {
-    if (!content) return null;
-    
-    return (
-      <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white font-space-grotesk relative`}>
-        <span className="whitespace-pre-wrap">{content}</span>
-        <span className="inline-block w-[2px] h-4 bg-white animate-pulse ml-1"></span>
-      </div>
-    );
-  };
 
   return (
     <div 
@@ -302,8 +318,16 @@ export default function NodeSidebar({
             threadMessages.map((msg, idx) => {
               const isUser = msg.role === 'user';
               const isModel = msg.role === 'model';
-              const contentHasMarkdown = isModel && hasMarkdown(msg.content);
-              const parsedContent = isModel ? parseThoughts(msg.content) : null;
+              const isStreaming = isStreamingMessage(msg, idx);
+              
+              // Get content - either from streaming state or message content
+              let displayContent = msg.content;
+              if (isStreaming && streamingState?.isStreaming) {
+                displayContent = getStreamingContent();
+              }
+              
+              const contentHasMarkdown = isModel && hasMarkdown(displayContent);
+              const parsedContent = isModel ? parseThoughts(displayContent) : null;
               const isThoughtsExpanded = expandedThoughts.has(idx);
               
               return (
@@ -334,9 +358,9 @@ export default function NodeSidebar({
                         {isUser ? 'You' : getModelName((msg as any).modelId)}
                       </div>
                       {/* Copy button for model responses */}
-                      {isModel && (
+                      {isModel && displayContent && (
                         <CopyButton 
-                          content={parsedContent?.hasThoughts ? parsedContent.answer || msg.content : msg.content} 
+                          content={parsedContent?.hasThoughts ? parsedContent.answer || displayContent : displayContent} 
                           size={isMobile ? 10 : 12} 
                           className="opacity-60 hover:opacity-100"
                         />
@@ -376,7 +400,7 @@ export default function NodeSidebar({
                     )}
                     
                     {/* Thoughts dropdown for model messages */}
-                    {isModel && parsedContent?.hasThoughts && (
+                    {isModel && parsedContent?.hasThoughts && !isStreaming && (
                       <div className="mb-2">
                         <button
                           onClick={() => toggleThoughts(idx)}
@@ -403,28 +427,32 @@ export default function NodeSidebar({
                     )}
                     
                     {/* Message content */}
-                    {isModel && parsedContent?.hasThoughts ? (
-                      // Show only the answer part if thoughts are present
-                      parsedContent.answer && (contentHasMarkdown ? (
-                        <div className="markdown-content font-space-grotesk">
-                          <MarkdownRenderer content={cleanMarkdownContent(parsedContent.answer)} />
-                        </div>
-                      ) : (
-                        <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.answer)}</div>
-                      ))
+                    {isStreaming ? (
+                      <StreamingContent content={displayContent} />
                     ) : (
-                      // Show full content for non-thinking responses
-                      isModel && contentHasMarkdown ? (
-                        <div className="markdown-content font-space-grotesk">
-                          <MarkdownRenderer content={cleanMarkdownContent(msg.content)} />
-                        </div>
+                      isModel && parsedContent?.hasThoughts ? (
+                        // Show only the answer part if thoughts are present
+                        parsedContent.answer && (contentHasMarkdown ? (
+                          <div className="markdown-content font-space-grotesk">
+                            <MarkdownRenderer content={cleanMarkdownContent(parsedContent.answer)} />
+                          </div>
+                        ) : (
+                          <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.answer)}</div>
+                        ))
                       ) : (
-                        <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(msg.content)}</div>
+                        // Show full content for non-thinking responses
+                        isModel && contentHasMarkdown ? (
+                          <div className="markdown-content font-space-grotesk">
+                            <MarkdownRenderer content={cleanMarkdownContent(displayContent)} />
+                          </div>
+                        ) : (
+                          <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(displayContent)}</div>
+                        )
                       )
                     )}
 
                     {/* Citations and search suggestions for model responses */}
-                    {isModel && (msg as any).groundingMetadata && (
+                    {isModel && (msg as any).groundingMetadata && !isStreaming && (
                       <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
                         <Citations
                           citations={(msg as any).groundingMetadata.citations}
@@ -440,53 +468,6 @@ export default function NodeSidebar({
             })
           ) : (
             <div className={`text-center text-gray-400 ${isMobile ? 'py-6' : 'py-8'} font-space-grotesk`}>No messages in this conversation yet</div>
-          )}
-          
-          {/* Streaming content - only show when actively streaming */}
-          {(streamingState?.isStreaming || isActiveNodeLoading) && (
-            <div className="flex justify-start">
-              <div className={`${isMobile ? 'max-w-[90%]' : 'max-w-[80%]'} ${
-                isMobile ? 'px-3 py-2' : 'px-4 py-3'
-              } rounded-2xl shadow-md bg-white/5 backdrop-blur-sm border border-white/10 relative`}>
-                
-                {/* Gemini icon */}
-                <div className={`absolute ${isMobile ? '-top-4 -left-4' : '-top-5 -left-5'} flex items-center`}>
-                  <SiGooglegemini size={isMobile ? 18 : 22} className="text-blue-300 drop-shadow-md" />
-                </div>
-                
-                {/* Header */}
-                <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-gray-300/80 mb-2 font-space-grotesk`}>
-                  {getModelName()}
-                </div>
-                
-                {/* Streaming states */}
-                {streamingState?.isStreaming ? (
-                  <div className="space-y-2">
-                    {/* Show thoughts if in thinking phase */}
-                    {(streamingState.isThinkingPhase || streamingState.currentThoughts) && (
-                      <StreamingThoughts content={streamingState.currentThoughts} />
-                    )}
-                    
-                    {/* Show message content if in message phase */}
-                    {(streamingState.messagePhase || streamingState.currentMessage) && (
-                      <StreamingMessage content={streamingState.currentMessage} />
-                    )}
-                    
-                    {/* If no content yet, show loading dots */}
-                    {!streamingState.currentThoughts && !streamingState.currentMessage && (
-                      <div className="flex items-center gap-2">
-                        <LoadingDots />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* Fallback loading state */
-                  <div className="flex items-center gap-2">
-                    <LoadingDots />
-                  </div>
-                )}
-              </div>
-            </div>
           )}
           
           {/* Bottom margin for conversation */}

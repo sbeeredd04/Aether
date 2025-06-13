@@ -419,6 +419,11 @@ export async function* generateContentStream(
             yield { type: 'message', content: p.text };
           }
         }
+        
+        // Add a small delay between chunks to prevent UI overwhelm
+        if (chunkCount % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1));
+        }
       }
 
       // Generate TTS if requested
@@ -503,6 +508,11 @@ export async function* generateContentStream(
         fullResponse += chunk.text;
         serverLogger.debug("🔄 Streaming: Chat chunk", { requestId, chunkCount, length: chunk.text.length });
         yield { type: 'message', content: chunk.text };
+        
+        // Add a small delay between chunks to prevent UI overwhelm
+        if (chunkCount % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1));
+        }
       }
     }
 

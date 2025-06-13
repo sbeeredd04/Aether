@@ -49,6 +49,7 @@ interface ChatState {
   onEdgesChange: (changes: EdgeChange[]) => void;
   addMessageToNode: (nodeId: string, message: ChatMessage, isPartial?: boolean) => void;
   removeLastMessageFromNode: (nodeId: string) => void;
+  updateLastMessageInNode: (nodeId: string, content: string, modelId?: string) => void;
   createNodeAndEdge: (sourceNodeId: string, label: string, type: 'response' | 'branch') => string; // Return new nodeId
   getPathToNode: (targetNodeId: string) => ChatMessage[];
   getPathNodeIds: (targetNodeId: string) => string[];
@@ -659,6 +660,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
     
     // Save to session after removing message
     get().saveToSession();
+  },
+
+  updateLastMessageInNode: (nodeId, content, modelId) => {
+    logger.debug('ChatStore: Updating last message in node', { 
+      nodeId, 
+      contentLength: content.length,
+      modelId
+    });
+
+    set((state) => ({
+      nodes: state.nodes.map((node) => {
+        if (node.id === nodeId && node.data.chatHistory.length > 0) {
+          const chatHistory = [...node.data.chatHistory];
+          const lastMessage = chatHistory[chatHistory.length - 1];
+          
+          // Only update if it's a model message and matches the expected model
+          if (lastMessage.role === 'model' && (!modelId || (lastMessage as any).modelId === modelId)) {
+            chatHistory[chatHistory.length - 1] = {
+              ...lastMessage,
+              content
+            };
+            
+            logger.debug('ChatStore: Last message updated', { 
+              nodeId,
+              contentLength: content.length,
+              messageIndex: chatHistory.length - 1
+            });
+            
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                chatHistory,
+              },
+            };
+          }
+        }
+        return node;
+      }),
+    }));
+    
+    // Don't save to session during streaming updates to avoid performance issues
   },
 
   createNodeAndEdge: (sourceNodeId, label, type) => {

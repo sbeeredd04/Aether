@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiExternalLink, FiSearch } from 'react-icons/fi';
+import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
 
 export interface Citation {
   title: string;
@@ -13,9 +14,10 @@ interface CitationsProps {
   searchQueries?: string[];
   searchEntryPoint?: string;
   className?: string;
+  enableMarkdown?: boolean;
 }
 
-export default function Citations({ citations, searchQueries, searchEntryPoint, className = '' }: CitationsProps) {
+export default function Citations({ citations, searchQueries, searchEntryPoint, className = '', enableMarkdown = false }: CitationsProps) {
   if (!citations?.length && !searchQueries?.length && !searchEntryPoint) {
     return null;
   }
@@ -79,9 +81,15 @@ export default function Citations({ citations, searchQueries, searchEntryPoint, 
                       {new URL(citation.uri).hostname}
                     </div>
                     {citation.snippet && (
-                      <p className="text-neutral-400 text-xs mt-1 line-clamp-2 leading-relaxed">
-                        {citation.snippet}
-                      </p>
+                      <div className="text-neutral-400 text-xs mt-1 line-clamp-2 leading-relaxed">
+                        {enableMarkdown && hasMarkdown(citation.snippet) ? (
+                          <div className="markdown-content">
+                            <MarkdownRenderer content={citation.snippet} />
+                          </div>
+                        ) : (
+                          <p>{citation.snippet}</p>
+                        )}
+                      </div>
                     )}
                   </div>
                   {citation.confidenceScore && citation.confidenceScore > 0 && (
@@ -184,5 +192,34 @@ export const searchSuggestionsCSS = `
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+/* Markdown styling in citations */
+.citation-item .markdown-content {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.citation-item .markdown-content p {
+  margin: 0;
+  display: inline;
+}
+
+.citation-item .markdown-content strong {
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.citation-item .markdown-content em {
+  font-style: italic;
+  color: #d1d5db;
+}
+
+.citation-item .markdown-content code {
+  background-color: rgba(55, 65, 81, 0.5);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'Fira Code', 'Consolas', monospace;
 }
 `; 

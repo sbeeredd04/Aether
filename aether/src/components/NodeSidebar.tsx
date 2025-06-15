@@ -45,6 +45,7 @@ interface StreamingState {
       snippet?: string;
       confidenceScore?: number;
     }>;
+    loadingMessage?: string;
   };
 }
 
@@ -719,37 +720,81 @@ export default function NodeSidebar({
                           searchQueries={(msg as any).groundingMetadata.webSearchQueries}
                           searchEntryPoint={(msg as any).groundingMetadata.searchEntryPoint?.renderedContent}
                           className={isMobile ? 'text-xs' : 'text-sm'}
+                          enableMarkdown={true}
                         />
                       </div>
                       );
                     })()}
 
                     {/* Streaming grounding metadata display */}
-                    {isModel && isStreaming && streamingState?.groundingMetadata && (() => {
-                      console.log('🔍 NODESIDEBAR DEBUG: Rendering citations for streaming message', {
-                        messageIndex: idx,
-                        nodeId: nodeId,
-                        streamingGroundingMetadata: streamingState.groundingMetadata,
-                        citationsCount: streamingState.groundingMetadata.citations?.length || 0,
-                        searchQueriesCount: streamingState.groundingMetadata.webSearchQueries?.length || 0,
-                        hasSearchEntryPoint: !!streamingState.groundingMetadata.searchEntryPoint?.renderedContent,
-                        isStreaming: streamingState.isStreaming
-                      });
+                    {isModel && isStreaming && (() => {
+                      // Check for grounding-related content
+                      const hasGroundingMetadata = !!streamingState?.groundingMetadata?.citations;
+                      const hasLoadingMessage = !!streamingState?.groundingMetadata?.loadingMessage;
+                      const isGroundingEnabled = (msg as any).modelId?.includes('web') || 
+                                                (msg as any).modelId?.includes('grounding') || 
+                                                (msg as any).modelId?.includes('thinking') ||
+                                                streamingState?.isStreaming; // Show for any streaming model that might use grounding
                       
-                      return (
-                        <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
-                          <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
-                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                            Web search results
+                      // Show loading state if we have a loading message or if grounding is enabled but no metadata yet
+                      if ((hasLoadingMessage || (!hasGroundingMetadata && isGroundingEnabled)) && streamingState?.isStreaming) {
+                        const loadingText = streamingState?.groundingMetadata?.loadingMessage || 'Searching the web...';
+                        
+                        console.log('🔍 NODESIDEBAR DEBUG: Showing web search loading state', {
+                          messageIndex: idx,
+                          nodeId: nodeId,
+                          isStreaming: streamingState.isStreaming,
+                          hasGroundingMetadata,
+                          hasLoadingMessage,
+                          isGroundingEnabled,
+                          loadingText,
+                          modelId: (msg as any).modelId
+                        });
+                        
+                        return (
+                          <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
+                            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
+                              <div className="flex gap-1">
+                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]"></div>
+                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:150ms]"></div>
+                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
+                              </div>
+                              {loadingText}
+                            </div>
                           </div>
-                          <Citations
-                            citations={streamingState.groundingMetadata.citations}
-                            searchQueries={streamingState.groundingMetadata.webSearchQueries}
-                            searchEntryPoint={streamingState.groundingMetadata.searchEntryPoint?.renderedContent}
-                            className={isMobile ? 'text-xs' : 'text-sm'}
-                          />
-                        </div>
-                      );
+                        );
+                      }
+                      
+                      // Show actual grounding metadata if available
+                      if (hasGroundingMetadata && streamingState?.groundingMetadata) {
+                        console.log('🔍 NODESIDEBAR DEBUG: Rendering citations for streaming message', {
+                          messageIndex: idx,
+                          nodeId: nodeId,
+                          streamingGroundingMetadata: streamingState.groundingMetadata,
+                          citationsCount: streamingState.groundingMetadata.citations?.length || 0,
+                          searchQueriesCount: streamingState.groundingMetadata.webSearchQueries?.length || 0,
+                          hasSearchEntryPoint: !!streamingState.groundingMetadata.searchEntryPoint?.renderedContent,
+                          isStreaming: streamingState.isStreaming
+                        });
+                        
+                        return (
+                          <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
+                            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                              Web search results
+                            </div>
+                            <Citations
+                              citations={streamingState.groundingMetadata.citations}
+                              searchQueries={streamingState.groundingMetadata.webSearchQueries}
+                              searchEntryPoint={streamingState.groundingMetadata.searchEntryPoint?.renderedContent}
+                              className={isMobile ? 'text-xs' : 'text-sm'}
+                              enableMarkdown={true}
+                            />
+                          </div>
+                        );
+                      }
+                      
+                      return null;
                     })()}
                   </div>
                 </div>

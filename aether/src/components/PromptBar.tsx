@@ -624,8 +624,22 @@ export default function PromptBar({
                             useChatStore.setState({ nodes: [...groundingNodes] });
                           }
                         }
+                      } else if (data.content) {
+                        // Handle loading state messages (like "Searching the web...")
+                        console.log('🔍 PROMPTBAR DEBUG: Received grounding loading state', {
+                          content: data.content,
+                          selectedModel,
+                          nodeId: node.id
+                        });
+                        
+                        logger.debug('PromptBar: Received grounding loading state', { 
+                          content: data.content
+                        });
+                        
+                        // Notify about the loading state
+                        onStreamingGrounding?.({ loadingMessage: data.content });
                       } else {
-                        console.log('🔍 PROMPTBAR DEBUG: Received grounding chunk without metadata', {
+                        console.log('🔍 PROMPTBAR DEBUG: Received grounding chunk without metadata or content', {
                           data,
                           selectedModel,
                           nodeId: node.id

@@ -555,7 +555,10 @@ export async function* generateContentStreamWithGrounding(
   const startTime = Date.now();
 
   try {
-    // STEP 1: Get grounding information from Gemini 2.0 Flash (non-streaming)
+    // STEP 1: Emit web search loading state
+    yield { type: 'grounding', content: 'Searching the web...', groundingMetadata: undefined };
+    
+    // Get grounding information from Gemini 2.0 Flash (non-streaming)
     console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Step 1 - Getting grounding from Gemini 2.0 Flash', {
       requestId,
       prompt: prompt.substring(0, 100) + '...',

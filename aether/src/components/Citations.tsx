@@ -35,7 +35,7 @@ export default function Citations({ citations, searchQueries, searchEntryPoint, 
         <div className="search-suggestions mb-4 p-3 bg-neutral-800/50 rounded-lg border border-neutral-600">
           <div className="flex items-center gap-2 text-sm text-neutral-300 mb-2">
             <FiSearch size={14} />
-            Related searches:
+            <span className="font-medium">Related searches:</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {searchQueries.map((query, index) => (
@@ -57,7 +57,10 @@ export default function Citations({ citations, searchQueries, searchEntryPoint, 
       {/* Citations from grounding */}
       {citations && citations.length > 0 && (
         <div className="citations mb-4">
-          <div className="text-sm text-neutral-300 mb-2 font-medium">Sources:</div>
+          <div className="flex items-center gap-2 text-sm text-neutral-300 mb-3 font-medium">
+            <FiExternalLink size={14} />
+            <span>Sources ({citations.length}):</span>
+          </div>
           <div className="space-y-2">
             {citations.map((citation, index) => (
               <div key={index} className="citation-item p-3 bg-neutral-800/30 rounded-lg border border-neutral-700/50 hover:border-neutral-600/50 transition-colors">
@@ -67,20 +70,31 @@ export default function Citations({ citations, searchQueries, searchEntryPoint, 
                       href={citation.uri}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="citation-link text-blue-300 hover:text-blue-200 font-medium text-sm flex items-center gap-1 truncate"
+                      className="citation-link text-blue-300 hover:text-blue-200 font-medium text-sm flex items-center gap-1 group"
                     >
-                      {citation.title}
-                      <FiExternalLink size={12} className="flex-shrink-0" />
+                      <span className="truncate">{citation.title}</span>
+                      <FiExternalLink size={12} className="flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                     </a>
+                    <div className="text-xs text-neutral-500 mt-1 truncate">
+                      {new URL(citation.uri).hostname}
+                    </div>
                     {citation.snippet && (
-                      <p className="text-neutral-400 text-xs mt-1 line-clamp-2">
+                      <p className="text-neutral-400 text-xs mt-1 line-clamp-2 leading-relaxed">
                         {citation.snippet}
                       </p>
                     )}
                   </div>
-                  {citation.confidenceScore && (
-                    <div className="flex-shrink-0 text-xs text-neutral-500">
-                      {Math.round(citation.confidenceScore * 100)}%
+                  {citation.confidenceScore && citation.confidenceScore > 0 && (
+                    <div className="flex-shrink-0 flex flex-col items-end">
+                      <div className="text-xs text-neutral-500 font-medium">
+                        {Math.round(citation.confidenceScore * 100)}%
+                      </div>
+                      <div className="w-8 h-1 bg-neutral-700 rounded-full mt-1">
+                        <div 
+                          className="h-full bg-blue-400 rounded-full transition-all"
+                          style={{ width: `${citation.confidenceScore * 100}%` }}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

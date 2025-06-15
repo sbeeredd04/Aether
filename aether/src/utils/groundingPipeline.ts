@@ -91,6 +91,14 @@ User Query: ${prompt}`;
     // Step 2: Perform grounding search using gemini-2.0-flash
     serverLogger.info("GroundingPipeline: Step 2 - Performing grounding search", { requestId });
     
+    console.log(`🔍 PIPELINE DEBUG: Starting grounding with Gemini 2.0 Flash`, {
+      requestId,
+      prompt: prompt.substring(0, 200) + (prompt.length > 200 ? '...' : ''),
+      historyLength: history.length,
+      attachmentsCount: attachments?.length || 0,
+      groundingConfig: { enabled: true, dynamicThreshold: 0.3 }
+    });
+    
     const groundingResponse = await generateContent(
       apiKey,
       history,
@@ -101,6 +109,13 @@ User Query: ${prompt}`;
       { enabled: true, dynamicThreshold: 0.3 },
       false // No thinking for grounding
     );
+
+    console.log(`🔍 PIPELINE DEBUG: Grounding response received`, {
+      requestId,
+      responseType: 'text' in groundingResponse ? 'text' : 'other',
+      hasGroundingMetadata: 'groundingMetadata' in groundingResponse && !!groundingResponse.groundingMetadata,
+      responseLength: 'text' in groundingResponse ? groundingResponse.text.length : 0
+    });
 
     if (!('text' in groundingResponse)) {
       throw new Error('Failed to get grounding response');
@@ -116,17 +131,51 @@ User Query: ${prompt}`;
     if ('groundingMetadata' in groundingResponse && groundingResponse.groundingMetadata) {
       const metadata = groundingResponse.groundingMetadata;
       
+      console.log(`🔍 PIPELINE DEBUG: Raw grounding metadata from Gemini 2.0 Flash`, {
+        requestId,
+        metadata,
+        keys: Object.keys(metadata),
+        hasSearchEntryPoint: !!metadata.searchEntryPoint,
+        hasGroundingChunks: !!metadata.groundingChunks,
+        hasGroundingSupports: !!metadata.groundingSupports,
+        hasWebSearchQueries: !!metadata.webSearchQueries,
+        hasCitations: !!metadata.citations,
+        groundingChunksLength: metadata.groundingChunks?.length || 0,
+        groundingSupportsLength: metadata.groundingSupports?.length || 0,
+        webSearchQueriesLength: metadata.webSearchQueries?.length || 0,
+        citationsLength: metadata.citations?.length || 0
+      });
+      
       // Extract citations from grounding metadata
       citations = extractCitationsFromGrounding(metadata);
+      
+      console.log(`🔍 PIPELINE DEBUG: Extracted citations`, {
+        requestId,
+        extractedCitationsCount: citations.length,
+        citations: citations.map(c => ({
+          title: c.title?.substring(0, 50) + (c.title?.length > 50 ? '...' : ''),
+          uri: c.uri,
+          confidenceScore: c.confidenceScore,
+          snippetLength: c.snippet?.length || 0
+        }))
+      });
       
       // Extract search entry point
       if (metadata.searchEntryPoint?.renderedContent) {
         searchEntryPoint = metadata.searchEntryPoint.renderedContent;
+        console.log(`🔍 PIPELINE DEBUG: Search entry point found`, {
+          requestId,
+          searchEntryPointLength: searchEntryPoint.length
+        });
       }
       
       // Use actual search queries from metadata if available
       if (metadata.webSearchQueries && metadata.webSearchQueries.length > 0) {
         actualSearchQueries = metadata.webSearchQueries;
+        console.log(`🔍 PIPELINE DEBUG: Using actual search queries from metadata`, {
+          requestId,
+          actualSearchQueries
+        });
       }
       
       serverLogger.info("GroundingPipeline: Extracted metadata", {
@@ -134,6 +183,12 @@ User Query: ${prompt}`;
         citationsCount: citations.length,
         hasSearchEntryPoint: !!searchEntryPoint,
         actualSearchQueriesCount: actualSearchQueries.length
+      });
+    } else {
+      console.log(`🔍 PIPELINE DEBUG: No grounding metadata in response`, {
+        requestId,
+        hasGroundingMetadata: 'groundingMetadata' in groundingResponse,
+        groundingMetadata: 'groundingMetadata' in groundingResponse ? groundingResponse.groundingMetadata : null
       });
     }
     
@@ -153,11 +208,11 @@ ${groundedContent}
 
 Original User Question: ${prompt}
 
-Please provide a thoughtful response that incorporates the grounded information while showing your reasoning process.`;
+Please provide a thoughtful response that incorporates the grounded information while showing your reasoning process. Make sure to reference the sources where relevant, but don't include URLs in your response as they will be provided separately as citations.`;
 
       const thinkingResponse = await generateContent(
         apiKey,
-        [],
+        history, // Include conversation history for better context
         contextPrompt,
         "gemini-2.5-flash-preview-05-20",
         attachments,
@@ -182,9 +237,14 @@ Please provide a thoughtful response that incorporates the grounded information 
         searchEntryPoint: searchEntryPoint
       };
     } else {
-      // Return grounded response without thinking
+      // Return grounded response without additional processing
+      // Add a brief note about web search being used
+      const enhancedContent = `${groundedContent}
+
+*This response is based on current web search results and may contain the most up-to-date information available.*`;
+
       return {
-        text: groundedContent,
+        text: enhancedContent,
         searchQueries: actualSearchQueries,
         citations: citations,
         searchEntryPoint: searchEntryPoint

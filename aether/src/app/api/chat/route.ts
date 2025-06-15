@@ -1,4 +1,4 @@
-import { generateContent, generateContentStream, GroundedTextResponse } from '@/utils/gemini';
+import { generateContent, generateContentStream, generateContentStreamWithGrounding, GroundedTextResponse } from '@/utils/gemini';
 import { executeGroundingPipeline, extractCitationsFromGrounding } from '@/utils/groundingPipeline';
 import serverLogger from '@/utils/serverLogger';
 import { NextRequest, NextResponse } from 'next/server';
@@ -50,26 +50,83 @@ export async function POST(req: NextRequest) {
       const streamResponse = new ReadableStream({
         async start(controller) {
           try {
-            const streamGenerator = generateContentStream(
-              apiKey,
-              history,
-              prompt,
-              modelId,
-              attachments,
-              ttsOptions,
-              grounding,
-              enableThinking
-            );
+            // Determine which streaming method to use
+            let streamGenerator;
+            
+            if (useGroundingPipeline && grounding?.enabled) {
+              console.log(`🔍 API STREAMING DEBUG: Using streaming grounding pipeline`, {
+                requestId,
+                modelId,
+                useGroundingPipeline,
+                groundingEnabled: grounding.enabled
+              });
+              
+              serverLogger.info('🔄 API: Using streaming grounding pipeline', { requestId, modelId });
+              
+              streamGenerator = generateContentStreamWithGrounding(
+                apiKey,
+                history,
+                prompt,
+                modelId,
+                attachments,
+                ttsOptions,
+                grounding,
+                enableThinking
+              );
+            } else {
+              console.log(`🔍 API STREAMING DEBUG: Using standard streaming`, {
+                requestId,
+                modelId,
+                useGroundingPipeline,
+                groundingEnabled: grounding?.enabled
+              });
+              
+              streamGenerator = generateContentStream(
+                apiKey,
+                history,
+                prompt,
+                modelId,
+                attachments,
+                ttsOptions,
+                grounding,
+                enableThinking
+              );
+            }
 
             let chunkCount = 0;
             for await (const chunk of streamGenerator) {
               chunkCount++;
               
+              console.log(`🔍 API STREAMING DEBUG: Received chunk`, {
+                requestId,
+                chunkCount,
+                type: chunk.type,
+                contentLength: chunk.content.length,
+                hasAudioData: !!chunk.audioData,
+                hasGroundingMetadata: !!chunk.groundingMetadata,
+                groundingMetadata: chunk.groundingMetadata ? {
+                  hasCitations: !!chunk.groundingMetadata.citations,
+                  citationsCount: chunk.groundingMetadata.citations?.length || 0,
+                  hasSearchQueries: !!chunk.groundingMetadata.webSearchQueries,
+                  searchQueriesCount: chunk.groundingMetadata.webSearchQueries?.length || 0,
+                  hasSearchEntryPoint: !!chunk.groundingMetadata.searchEntryPoint
+                } : null
+              });
+              
               const streamData = {
                 type: chunk.type,
                 content: chunk.content,
-                ...(chunk.audioData && { audioData: chunk.audioData })
+                ...(chunk.audioData && { audioData: chunk.audioData }),
+                ...(chunk.groundingMetadata && { groundingMetadata: chunk.groundingMetadata })
               };
+
+              if (chunk.groundingMetadata) {
+                console.log(`🔍 API STREAMING DEBUG: Sending grounding metadata to client`, {
+                  requestId,
+                  chunkCount,
+                  groundingMetadata: chunk.groundingMetadata
+                });
+              }
 
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify(streamData)}\n\n`)
@@ -121,6 +178,14 @@ export async function POST(req: NextRequest) {
 
     // Check if grounding pipeline should be used
     if (useGroundingPipeline && grounding?.enabled) {
+      console.log(`🔍 API DEBUG: Using grounding pipeline`, {
+        requestId,
+        modelId,
+        useGroundingPipeline,
+        groundingEnabled: grounding.enabled,
+        enableThinking
+      });
+
       serverLogger.info('API: Using grounding pipeline', { requestId });
 
       const groundingResult = await executeGroundingPipeline(
@@ -131,6 +196,14 @@ export async function POST(req: NextRequest) {
         enableThinking
       );
 
+      console.log(`🔍 API DEBUG: Grounding pipeline result`, {
+        requestId,
+        textLength: groundingResult.text.length,
+        citationsCount: groundingResult.citations?.length || 0,
+        searchQueriesCount: groundingResult.searchQueries?.length || 0,
+        hasSearchEntryPoint: !!groundingResult.searchEntryPoint
+      });
+
       result = {
         text: groundingResult.text,
         groundingMetadata: {
@@ -140,6 +213,14 @@ export async function POST(req: NextRequest) {
         }
       };
     } else {
+      console.log(`🔍 API DEBUG: Using direct Gemini API`, {
+        requestId,
+        modelId,
+        useGroundingPipeline,
+        groundingEnabled: grounding?.enabled,
+        directGroundingSupported: !!grounding?.enabled
+      });
+
       result = await generateContent(
         apiKey,
         history,
@@ -150,6 +231,13 @@ export async function POST(req: NextRequest) {
         grounding,
         enableThinking
       );
+
+      console.log(`🔍 API DEBUG: Direct Gemini API result`, {
+        requestId,
+        resultType: 'text' in result ? 'text' : 'other',
+        hasGroundingMetadata: 'groundingMetadata' in result && !!result.groundingMetadata,
+        textLength: 'text' in result ? result.text.length : 0
+      });
     }
     
     serverLogger.info('API: Non-streaming complete', { 

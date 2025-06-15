@@ -22,6 +22,7 @@ interface PromptBarProps {
   onStreamingStart?: () => void;
   onStreamingThought?: (thought: string) => void;
   onStreamingMessage?: (messageChunk: string) => void;
+  onStreamingGrounding?: (metadata: any) => void;
   onStreamingComplete?: () => void;
   onStreamingError?: (error: string) => void;
 }
@@ -53,6 +54,7 @@ export default function PromptBar({
   onStreamingStart,
   onStreamingThought,
   onStreamingMessage,
+  onStreamingGrounding,
   onStreamingComplete,
   onStreamingError
 }: PromptBarProps) {
@@ -590,6 +592,47 @@ export default function PromptBar({
                       }
                       break;
                       
+                    case 'grounding':
+                      if (data.groundingMetadata) {
+                        console.log('🔍 PROMPTBAR DEBUG: Received grounding metadata from streaming', {
+                          groundingMetadata: data.groundingMetadata,
+                          citationsCount: data.groundingMetadata.citations?.length || 0,
+                          searchQueriesCount: data.groundingMetadata.webSearchQueries?.length || 0,
+                          hasSearchEntryPoint: !!data.groundingMetadata.searchEntryPoint,
+                          selectedModel,
+                          nodeId: node.id
+                        });
+
+                        logger.debug('PromptBar: Received grounding metadata', { 
+                          citationsCount: data.groundingMetadata.citations?.length || 0,
+                          searchQueriesCount: data.groundingMetadata.webSearchQueries?.length || 0
+                        });
+                        onStreamingGrounding?.(data.groundingMetadata);
+                        
+                        // Update the placeholder message with grounding metadata
+                        const { nodes: groundingNodes } = useChatStore.getState();
+                        const groundingCurrentNode = groundingNodes.find(n => n.id === node.id);
+                        if (groundingCurrentNode && groundingCurrentNode.data.chatHistory.length > 0) {
+                          const lastMessage = groundingCurrentNode.data.chatHistory[groundingCurrentNode.data.chatHistory.length - 1];
+                          if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
+                            (lastMessage as any).groundingMetadata = data.groundingMetadata;
+                            console.log('🔍 PROMPTBAR DEBUG: Updated message with grounding metadata', {
+                              messageIndex: groundingCurrentNode.data.chatHistory.length - 1,
+                              nodeId: node.id,
+                              groundingMetadata: data.groundingMetadata
+                            });
+                            useChatStore.setState({ nodes: [...groundingNodes] });
+                          }
+                        }
+                      } else {
+                        console.log('🔍 PROMPTBAR DEBUG: Received grounding chunk without metadata', {
+                          data,
+                          selectedModel,
+                          nodeId: node.id
+                        });
+                      }
+                      break;
+                      
                     case 'complete':
                       if (data.audioData) {
                         audioData = data.audioData;
@@ -645,6 +688,10 @@ export default function PromptBar({
             const lastMessage = currentNode.data.chatHistory[currentNode.data.chatHistory.length - 1];
             if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
               Object.assign(lastMessage, finalMessage);
+              // Preserve grounding metadata if it exists
+              if ((lastMessage as any).groundingMetadata) {
+                finalMessage.groundingMetadata = (lastMessage as any).groundingMetadata;
+              }
               useChatStore.setState({ nodes: [...nodes] });
             }
           }
@@ -686,6 +733,17 @@ export default function PromptBar({
           
           // Add grounding metadata if present
           if (data.groundingMetadata) {
+            console.log('🔍 PROMPTBAR DEBUG: Non-streaming response with grounding metadata', {
+              groundingMetadata: data.groundingMetadata,
+              hasSearchQueries: !!data.groundingMetadata.webSearchQueries,
+              searchQueriesCount: data.groundingMetadata.webSearchQueries?.length || 0,
+              hasCitations: !!data.groundingMetadata.citations,
+              citationsCount: data.groundingMetadata.citations?.length || 0,
+              hasSearchEntryPoint: !!data.groundingMetadata.searchEntryPoint,
+              selectedModel,
+              nodeId: node.id
+            });
+
             modelMessage.groundingMetadata = data.groundingMetadata;
             logger.debug('PromptBar: Added grounding metadata to message', {
               hasSearchQueries: !!data.groundingMetadata.webSearchQueries,
@@ -693,6 +751,12 @@ export default function PromptBar({
               hasCitations: !!data.groundingMetadata.citations,
               citationsCount: data.groundingMetadata.citations?.length || 0,
               hasSearchEntryPoint: !!data.groundingMetadata.searchEntryPoint
+            });
+          } else {
+            console.log('🔍 PROMPTBAR DEBUG: Non-streaming response without grounding metadata', {
+              selectedModel,
+              nodeId: node.id,
+              responseLength: data.text.length
             });
           }
           

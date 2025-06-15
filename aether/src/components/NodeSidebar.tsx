@@ -19,6 +19,33 @@ interface StreamingState {
   messagePhase: boolean;
   thoughtStartTime?: number;
   thoughtEndTime?: number;
+  groundingMetadata?: {
+    searchEntryPoint?: {
+      renderedContent: string;
+    };
+    groundingChunks?: Array<{
+      web?: {
+        uri: string;
+        title: string;
+      };
+    }>;
+    groundingSupports?: Array<{
+      segment: {
+        startIndex?: number;
+        endIndex?: number;
+        text: string;
+      };
+      groundingChunkIndices: number[];
+      confidenceScores: number[];
+    }>;
+    webSearchQueries?: string[];
+    citations?: Array<{
+      title: string;
+      uri: string;
+      snippet?: string;
+      confidenceScore?: number;
+    }>;
+  };
 }
 
 interface NodeSidebarProps {
@@ -675,7 +702,17 @@ export default function NodeSidebar({
                     )}
 
                     {/* Citations and search suggestions for model responses */}
-                    {isModel && (msg as any).groundingMetadata && !isStreaming && (
+                    {isModel && (msg as any).groundingMetadata && !isStreaming && (() => {
+                      console.log('🔍 NODESIDEBAR DEBUG: Rendering citations for completed message', {
+                        messageIndex: idx,
+                        nodeId: nodeId,
+                        groundingMetadata: (msg as any).groundingMetadata,
+                        citationsCount: (msg as any).groundingMetadata.citations?.length || 0,
+                        searchQueriesCount: (msg as any).groundingMetadata.webSearchQueries?.length || 0,
+                        hasSearchEntryPoint: !!(msg as any).groundingMetadata.searchEntryPoint?.renderedContent
+                      });
+                      
+                      return (
                       <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
                         <Citations
                           citations={(msg as any).groundingMetadata.citations}
@@ -684,7 +721,36 @@ export default function NodeSidebar({
                           className={isMobile ? 'text-xs' : 'text-sm'}
                         />
                       </div>
-                    )}
+                      );
+                    })()}
+
+                    {/* Streaming grounding metadata display */}
+                    {isModel && isStreaming && streamingState?.groundingMetadata && (() => {
+                      console.log('🔍 NODESIDEBAR DEBUG: Rendering citations for streaming message', {
+                        messageIndex: idx,
+                        nodeId: nodeId,
+                        streamingGroundingMetadata: streamingState.groundingMetadata,
+                        citationsCount: streamingState.groundingMetadata.citations?.length || 0,
+                        searchQueriesCount: streamingState.groundingMetadata.webSearchQueries?.length || 0,
+                        hasSearchEntryPoint: !!streamingState.groundingMetadata.searchEntryPoint?.renderedContent,
+                        isStreaming: streamingState.isStreaming
+                      });
+                      
+                      return (
+                        <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
+                          <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
+                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                            Web search results
+                          </div>
+                          <Citations
+                            citations={streamingState.groundingMetadata.citations}
+                            searchQueries={streamingState.groundingMetadata.webSearchQueries}
+                            searchEntryPoint={streamingState.groundingMetadata.searchEntryPoint?.renderedContent}
+                            className={isMobile ? 'text-xs' : 'text-sm'}
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );

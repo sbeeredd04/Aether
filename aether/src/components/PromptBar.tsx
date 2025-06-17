@@ -19,7 +19,7 @@ interface PromptBarProps {
   onClearVoiceTranscript?: () => void;
   isMobile?: boolean;
   // Streaming callbacks
-  onStreamingStart?: () => void;
+  onStreamingStart?: (config: { groundingEnabled: boolean; useGroundingPipeline: boolean; modelSupportsThinking: boolean; }) => void;
   onStreamingThought?: (thought: string) => void;
   onStreamingMessage?: (messageChunk: string) => void;
   onStreamingGrounding?: (metadata: any) => void;
@@ -518,8 +518,13 @@ export default function PromptBar({
           throw new Error('No response body for streaming');
         }
 
-        // Notify that streaming started
-        onStreamingStart?.();
+        // Notify that streaming started with configuration
+        const streamingConfig = {
+          groundingEnabled: grounding.enabled,
+          useGroundingPipeline: !!currentModel?.useGroundingPipeline,
+          modelSupportsThinking: !!supportsThinking
+        };
+        onStreamingStart?.(streamingConfig);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -924,18 +929,6 @@ export default function PromptBar({
                   <TbBrandGoogle size={isMobile ? 14 : 16} />
                   {isMobile ? 'Web' : 'Web Search'}
                 </button>
-              )}
-
-              {/* Document Understanding Indicator (non-clickable) */}
-              {supportsDocuments && (
-                <div className={`
-                  flex items-center gap-2 ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-full font-medium
-                  bg-blue-600/20 text-blue-300 border border-blue-500/50 shadow-md
-                `}
-                >
-                  <FiFileText size={isMobile ? 14 : 16} />
-                  {isMobile ? 'Docs' : 'Document AI'}
-                </div>
               )}
             </div>
             

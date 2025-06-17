@@ -19,6 +19,9 @@ interface StreamingState {
   messagePhase: boolean;
   thoughtStartTime?: number;
   thoughtEndTime?: number;
+  groundingEnabled?: boolean;
+  useGroundingPipeline?: boolean;
+  modelSupportsThinking?: boolean;
   groundingMetadata?: {
     searchEntryPoint?: {
       renderedContent: string;
@@ -819,22 +822,25 @@ export default function NodeSidebar({
                         // Check for grounding-related content
                         const hasGroundingMetadata = !!streamingState?.groundingMetadata?.citations;
                         const hasLoadingMessage = !!streamingState?.groundingMetadata?.loadingMessage;
-                        const isGroundingEnabled = (msg as any).modelId?.includes('web') || 
-                                                  (msg as any).modelId?.includes('grounding') || 
-                                                  (msg as any).modelId?.includes('thinking') ||
-                                                  streamingState?.isStreaming; // Show for any streaming model that might use grounding
                         
-                        // Show loading state if we have a loading message or if grounding is enabled but no metadata yet
-                        if ((hasLoadingMessage || (!hasGroundingMetadata && isGroundingEnabled)) && streamingState?.isStreaming) {
-                          const loadingText = streamingState?.groundingMetadata?.loadingMessage || 'Searching the web...';
+                        // Determine if grounding is actually enabled for this request
+                        const isActuallyGroundingEnabled = streamingState?.groundingEnabled === true;
+                        const isUsingGroundingPipeline = streamingState?.useGroundingPipeline === true;
+                        const modelSupportsThinking = streamingState?.modelSupportsThinking === true;
+                        
+                        // Show loading state based on actual pipeline configuration
+                        if (hasLoadingMessage && streamingState?.isStreaming) {
+                          // Show specific loading message from the grounding pipeline
+                          const loadingText = streamingState.groundingMetadata?.loadingMessage;
                           
-                          console.log('🔍 NODESIDEBAR DEBUG: Showing web search loading state', {
+                          console.log('🔍 NODESIDEBAR DEBUG: Showing specific loading state from pipeline', {
                             messageIndex: idx,
                             nodeId: nodeId,
                             isStreaming: streamingState.isStreaming,
                             hasGroundingMetadata,
                             hasLoadingMessage,
-                            isGroundingEnabled,
+                            isActuallyGroundingEnabled,
+                            isUsingGroundingPipeline,
                             loadingText,
                             modelId: (msg as any).modelId
                           });
@@ -848,6 +854,31 @@ export default function NodeSidebar({
                                   <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
                                 </div>
                                 {loadingText}
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        // Show general thinking loading state for thinking models without grounding
+                        if (!hasLoadingMessage && !hasGroundingMetadata && modelSupportsThinking && !isActuallyGroundingEnabled && streamingState?.isStreaming) {
+                          console.log('🔍 NODESIDEBAR DEBUG: Showing thinking-only loading state', {
+                            messageIndex: idx,
+                            nodeId: nodeId,
+                            isStreaming: streamingState.isStreaming,
+                            modelSupportsThinking,
+                            isActuallyGroundingEnabled,
+                            modelId: (msg as any).modelId
+                          });
+                          
+                          return (
+                            <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
+                              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-purple-300 mb-2 flex items-center gap-2`}>
+                                <div className="flex gap-1">
+                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0ms]"></div>
+                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:150ms]"></div>
+                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
+                                </div>
+                                Thinking...
                               </div>
                             </div>
                           );

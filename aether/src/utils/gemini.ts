@@ -584,8 +584,10 @@ export async function* generateContentStreamWithGrounding(
   const startTime = Date.now();
 
   try {
-    // STEP 1: Emit web search loading state
-    yield { type: 'grounding', content: 'Searching the web...', groundingMetadata: undefined };
+    // STEP 1: Emit web search loading state - only if grounding is enabled
+    if (grounding?.enabled) {
+      yield { type: 'grounding', content: 'Searching the web...', groundingMetadata: undefined };
+    }
     
     // Get grounding information from Gemini 2.0 Flash (non-streaming)
     console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Step 1 - Getting grounding from Gemini 2.0 Flash', {
@@ -633,7 +635,10 @@ export async function* generateContentStreamWithGrounding(
       }
     }
 
-    // STEP 2: Create enhanced prompt with grounding context
+    // STEP 2: Emit thinking phase loading state
+    yield { type: 'grounding', content: 'Analyzing with deep thinking...', groundingMetadata: undefined };
+
+    // Create enhanced prompt with grounding context
     let enhancedPrompt = prompt;
     if (groundingText && groundingMetadata?.citations && groundingMetadata.citations.length > 0) {
       const citationsText = groundingMetadata.citations

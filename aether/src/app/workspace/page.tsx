@@ -26,6 +26,37 @@ interface StreamingState {
   messagePhase: boolean;
   thoughtStartTime?: number;
   thoughtEndTime?: number;
+  groundingEnabled?: boolean;
+  useGroundingPipeline?: boolean;
+  modelSupportsThinking?: boolean;
+  groundingMetadata?: {
+    searchEntryPoint?: {
+      renderedContent: string;
+    };
+    groundingChunks?: Array<{
+      web?: {
+        uri: string;
+        title: string;
+      };
+    }>;
+    groundingSupports?: Array<{
+      segment: {
+        startIndex?: number;
+        endIndex?: number;
+        text: string;
+      };
+      groundingChunkIndices: number[];
+      confidenceScores: number[];
+    }>;
+    webSearchQueries?: string[];
+    citations?: Array<{
+      title: string;
+      uri: string;
+      snippet?: string;
+      confidenceScore?: number;
+    }>;
+    loadingMessage?: string;
+  };
 }
 
 export default function WorkspacePage() {
@@ -204,8 +235,8 @@ export default function WorkspacePage() {
   };
 
   // Streaming event handlers for PromptBar
-  const handleStreamingStart = () => {
-    console.log('🔄 Workspace: Streaming started');
+  const handleStreamingStart = (config: { groundingEnabled: boolean; useGroundingPipeline: boolean; modelSupportsThinking: boolean; }) => {
+    console.log('🔄 Workspace: Streaming started', config);
     setStreamingState({
       isStreaming: true,
       currentThoughts: '',
@@ -213,7 +244,10 @@ export default function WorkspacePage() {
       isShowingThoughts: false,
       isThinkingPhase: true,
       messagePhase: false,
-      thoughtStartTime: Date.now()
+      thoughtStartTime: Date.now(),
+      groundingEnabled: config.groundingEnabled,
+      useGroundingPipeline: config.useGroundingPipeline,
+      modelSupportsThinking: config.modelSupportsThinking
     });
   };
 
@@ -243,6 +277,14 @@ export default function WorkspacePage() {
     });
   };
 
+  const handleStreamingGrounding = (metadata: any) => {
+    console.log('🔄 Workspace: Grounding metadata received', metadata);
+    setStreamingState(prev => ({
+      ...prev,
+      groundingMetadata: metadata
+    }));
+  };
+
   const handleStreamingComplete = () => {
     console.log('🔄 Workspace: Streaming complete');
     setStreamingState(prev => ({
@@ -253,7 +295,10 @@ export default function WorkspacePage() {
       isThinkingPhase: false,
       messagePhase: false,
       thoughtStartTime: prev.thoughtStartTime,
-      thoughtEndTime: prev.thoughtEndTime || Date.now()
+      thoughtEndTime: prev.thoughtEndTime || Date.now(),
+      groundingEnabled: prev.groundingEnabled,
+      useGroundingPipeline: prev.useGroundingPipeline,
+      modelSupportsThinking: prev.modelSupportsThinking
     }));
   };
 
@@ -354,6 +399,7 @@ export default function WorkspacePage() {
               onStreamingStart={handleStreamingStart}
               onStreamingThought={handleStreamingThought}
               onStreamingMessage={handleStreamingMessage}
+              onStreamingGrounding={handleStreamingGrounding}
               onStreamingComplete={handleStreamingComplete}
               onStreamingError={handleStreamingError}
             />
@@ -526,6 +572,7 @@ export default function WorkspacePage() {
               onStreamingStart={handleStreamingStart}
               onStreamingThought={handleStreamingThought}
               onStreamingMessage={handleStreamingMessage}
+              onStreamingGrounding={handleStreamingGrounding}
               onStreamingComplete={handleStreamingComplete}
               onStreamingError={handleStreamingError}
             />

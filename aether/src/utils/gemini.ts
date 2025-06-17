@@ -249,14 +249,43 @@ export async function generateContent(
 
   // Process attachments
   if (attachments && attachments.length > 0) {
+    serverLogger.info("Gemini: Processing attachments", { 
+      requestId,
+      count: attachments.length,
+      types: attachments.map(att => att.type)
+    });
+    
     for (const att of attachments) {
       let cleanData = att.data;
       if (att.data.includes(',')) {
         cleanData = att.data.split(',')[1];
       }
+      
+      // Handle different document types
+      if (att.type === 'application/pdf' || 
+          att.type.startsWith('text/') || 
+          att.type.includes('javascript') || 
+          att.type.includes('python') ||
+          att.type.startsWith('image/')) {
+        
+        serverLogger.debug("Gemini: Adding document/media attachment", { 
+          requestId,
+          fileName: att.name,
+          mimeType: att.type,
+          isDocument: !att.type.startsWith('image/'),
+          dataLength: cleanData.length
+        });
+        
       contents.push({
         inlineData: { mimeType: att.type, data: cleanData },
       });
+      } else {
+        serverLogger.warn("Gemini: Unsupported attachment type", { 
+          requestId,
+          fileName: att.name,
+          mimeType: att.type
+        });
+      }
     }
   }
 
@@ -757,15 +786,43 @@ export async function* generateContentStream(
 
   // Process attachments
   if (attachments && attachments.length > 0) {
-    serverLogger.info("🔄 Streaming: Processing attachments", { requestId, count: attachments.length });
+    serverLogger.info("🔄 Streaming: Processing attachments", { 
+      requestId, 
+      count: attachments.length,
+      types: attachments.map(att => att.type)
+    });
+    
     for (const att of attachments) {
       let cleanData = att.data;
       if (att.data.includes(',')) {
         cleanData = att.data.split(',')[1];
       }
+      
+      // Handle different document types
+      if (att.type === 'application/pdf' || 
+          att.type.startsWith('text/') || 
+          att.type.includes('javascript') || 
+          att.type.includes('python') ||
+          att.type.startsWith('image/')) {
+        
+        serverLogger.debug("🔄 Streaming: Adding document/media attachment", { 
+          requestId,
+          fileName: att.name,
+          mimeType: att.type,
+          isDocument: !att.type.startsWith('image/'),
+          dataLength: cleanData.length
+        });
+        
       contents.push({
         inlineData: { mimeType: att.type, data: cleanData },
       });
+      } else {
+        serverLogger.warn("🔄 Streaming: Unsupported attachment type", { 
+          requestId,
+          fileName: att.name,
+          mimeType: att.type
+        });
+      }
     }
   }
 

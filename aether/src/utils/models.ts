@@ -10,13 +10,15 @@ export interface ModelDefinition {
     /** The exact model name to pass to the Gemini API */
     apiModel: string
     /** Input types this model supports */
-    supportedInputs: ('text' | 'audio' | 'image' | 'video')[]
+    supportedInputs: ('text' | 'audio' | 'image' | 'video' | 'document')[]
     /** Output types this model can generate */
     supportedOutputs: ('text' | 'audio' | 'image')[]
     /** Whether this model supports grounding/search */
     supportsGrounding?: boolean
     /** Whether this model supports citations */
     supportsCitations?: boolean
+    /** Whether this model supports document understanding (PDFs, etc.) */
+    supportsDocuments?: boolean
     /** Special capabilities */
     capabilities?: {
       thinking?: boolean
@@ -25,6 +27,7 @@ export interface ModelDefinition {
       realtime?: boolean
       multiSpeaker?: boolean
       interleaved?: boolean
+      documentUnderstanding?: boolean
     }
     /** Description of what the model is optimized for */
     optimizedFor?: string
@@ -38,29 +41,33 @@ export interface ModelDefinition {
       name: 'Gemini 2.5 Flash Preview',
       apiModel: 'gemini-2.5-flash-preview-05-20',
       isThinking: true, // Adaptive thinking
-      supportedInputs: ['text', 'audio', 'image', 'video'],
+      supportedInputs: ['text', 'audio', 'image', 'video', 'document'],
       supportedOutputs: ['text'],
-      supportsGrounding: false, // 2.5 models don't support search as tool
+      supportsGrounding: false, // 2.5 models don't support search as tool directly
       supportsCitations: true,
+      supportsDocuments: true, // Document understanding support
       capabilities: {
-        thinking: true
+        thinking: true,
+        documentUnderstanding: true
       },
-      optimizedFor: 'Adaptive thinking, cost efficiency'
+      optimizedFor: 'Adaptive thinking, cost efficiency, and document understanding'
     },
     {
       id: 'gemini-2.5-flash-web-thinking',
       name: 'Gemini 2.5 Flash Web + Thinking',
       apiModel: 'gemini-2.5-flash-preview-05-20',
       isThinking: true,
-      supportedInputs: ['text', 'audio', 'image', 'video'],
+      supportedInputs: ['text', 'audio', 'image', 'video', 'document'],
       supportedOutputs: ['text'],
       supportsGrounding: true, // Pipeline adds grounding
       supportsCitations: true,
+      supportsDocuments: true, // Document understanding support
       useGroundingPipeline: true,
       capabilities: {
-        thinking: true
+        thinking: true,
+        documentUnderstanding: true
       },
-      optimizedFor: 'Web-grounded responses with adaptive thinking'
+      optimizedFor: 'Web-grounded responses with adaptive thinking and document understanding'
     },
     // {
     //   id: 'gemini-2.5-flash-preview-tts',
@@ -81,38 +88,46 @@ export interface ModelDefinition {
       id: 'gemini-2.0-flash',
       name: 'Gemini 2.0 Flash',
       apiModel: 'gemini-2.0-flash',
-      supportedInputs: ['text', 'audio', 'image', 'video'],
+      supportedInputs: ['text', 'audio', 'image', 'video', 'document'],
       supportedOutputs: ['text'],
       supportsGrounding: true, // 2.0 models support search as tool
       supportsCitations: true,
+      supportsDocuments: true, // Document understanding support
       capabilities: {
-        realtime: true
+        realtime: true,
+        documentUnderstanding: true
       },
-      optimizedFor: 'Next generation features, speed, and realtime streaming'
+      optimizedFor: 'Next generation features, speed, realtime streaming, and document understanding'
     },
     {
       id: 'gemini-2.0-flash-preview-image-generation',
       name: 'Gemini 2.0 Flash Image Generation',
       apiModel: 'gemini-2.0-flash-preview-image-generation',
       isMultimedia: 'image',
-      supportedInputs: ['text', 'audio', 'image', 'video'],
+      supportedInputs: ['text', 'audio', 'image', 'video', 'document'],
       supportedOutputs: ['text', 'image'],
       supportsGrounding: true,
       supportsCitations: true,
+      supportsDocuments: true, // Document understanding support
       capabilities: {
-        imageGeneration: true
+        imageGeneration: true,
+        documentUnderstanding: true
       },
-      optimizedFor: 'Conversational image generation and editing'
+      optimizedFor: 'Conversational image generation, editing, and document understanding'
     },
     {
       id: 'gemini-2.0-flash-lite',
       name: 'Gemini 2.0 Flash-Lite',
       apiModel: 'gemini-2.0-flash-lite',
-      supportedInputs: ['text', 'audio', 'image', 'video'],
+      supportedInputs: ['text', 'audio', 'image', 'video', 'document'],
       supportedOutputs: ['text'],
       supportsGrounding: true,
       supportsCitations: true,
-      optimizedFor: 'Cost efficiency and low latency'
+      supportsDocuments: true, // Document understanding support
+      capabilities: {
+        documentUnderstanding: true
+      },
+      optimizedFor: 'Cost efficiency, low latency, and document understanding'
     },
   ]
   

@@ -569,6 +569,46 @@ export default function NodeSidebar({
                                 mimeType={att.type}
                                 className={`w-full ${isMobile ? 'max-w-[200px]' : 'max-w-[250px]'}`}
                               />
+                            ) : att.type === 'application/pdf' ? (
+                              <div className={`flex items-center gap-2 text-white p-2 w-full ${isMobile ? 'max-w-[200px]' : 'max-w-[250px]'} bg-red-600/20 rounded`}>
+                                <div className="flex flex-col items-center justify-center text-red-300">
+                                  <FiFileText size={isMobile ? 20 : 24} />
+                                  <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold`}>PDF</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <span className={`${isMobile ? 'text-xs' : 'text-sm'} truncate block text-red-200`}>{att.name}</span>
+                                  <span className={`${isMobile ? 'text-xs' : 'text-sm'} text-red-300/70`}>Document</span>
+                                </div>
+                              </div>
+                            ) : att.type.startsWith('text/') || att.type.includes('javascript') || att.type.includes('python') ? (
+                              <div className={`flex items-center gap-2 text-white p-2 w-full ${isMobile ? 'max-w-[200px]' : 'max-w-[250px]'} bg-blue-600/20 rounded`}>
+                                <div className="flex flex-col items-center justify-center text-blue-300">
+                                  <FiFileText size={isMobile ? 20 : 24} />
+                                  <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold`}>
+                                    {att.type.includes('javascript') ? 'JS' : 
+                                     att.type.includes('python') ? 'PY' : 
+                                     att.type.includes('html') ? 'HTML' :
+                                     att.type.includes('css') ? 'CSS' :
+                                     att.type.includes('markdown') ? 'MD' :
+                                     att.type.includes('csv') ? 'CSV' :
+                                     att.type.includes('xml') ? 'XML' :
+                                     'TXT'}
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <span className={`${isMobile ? 'text-xs' : 'text-sm'} truncate block text-blue-200`}>{att.name}</span>
+                                  <span className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300/70`}>
+                                    {att.type.includes('javascript') ? 'JavaScript' : 
+                                     att.type.includes('python') ? 'Python' : 
+                                     att.type.includes('html') ? 'HTML Document' :
+                                     att.type.includes('css') ? 'CSS Stylesheet' :
+                                     att.type.includes('markdown') ? 'Markdown' :
+                                     att.type.includes('csv') ? 'CSV Data' :
+                                     att.type.includes('xml') ? 'XML Document' :
+                                     'Text File'}
+                                  </span>
+                                </div>
+                              </div>
                             ) : (
                               <div className="flex items-center gap-2 text-white p-2 w-full max-w-[200px]">
                                 <FiFileText />
@@ -649,7 +689,7 @@ export default function NodeSidebar({
                                   const duration = getThoughtDuration(idx);
                                   return (
                                     <div className="text-blue-400/90 flex items-center gap-1 leading-relaxed">
-                                      <span>Thought for {duration}s</span>
+                                      <span>thought for {duration}s</span>
                                       <span className="text-blue-400">●</span>
                                     </div>
                                   );
@@ -663,7 +703,7 @@ export default function NodeSidebar({
                                 </div>
                                 <div className={`${isMobile ? 'text-sm' : 'text-base'} text-white/90 font-space-grotesk leading-relaxed`}>
                                   {hasMarkdown(parsedContent!.thoughts) ? (
-                                    <div className="markdown-content font-space-grotesk">
+                                <div className="markdown-content font-space-grotesk">
                                       <MarkdownRenderer content={cleanMarkdownContent(parsedContent!.thoughts)} />
                                 </div>
                               ) : (

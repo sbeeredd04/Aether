@@ -234,9 +234,9 @@ export default function WorkspacePage() {
       const shouldCaptureEndTime = prev.isThinkingPhase && !prev.thoughtEndTime;
       
       return {
-        ...prev,
-        currentMessage: prev.currentMessage + messageChunk,
-        messagePhase: true,
+      ...prev,
+      currentMessage: prev.currentMessage + messageChunk,
+      messagePhase: true,
         isThinkingPhase: false,
         thoughtEndTime: shouldCaptureEndTime ? Date.now() : prev.thoughtEndTime
       };

@@ -337,15 +337,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
       pathLength: pathMessages.length 
     });
 
+    // Extract attachments from the last user message (if any)
+    const lastMessage = pathMessages[pathMessages.length - 1];
+    const attachments = (lastMessage?.role === 'user' && lastMessage.attachments) ? lastMessage.attachments : undefined;
+    
+    // Get or create thread with document inheritance
     const thread = state.chatManager.getThread(nodeId, pathMessages);
     logger.debug('ChatStore: Got thread from chat manager', { 
       nodeId, 
-      hasThread: !!thread 
+      hasThread: !!thread,
+      threadDocuments: thread?.documentContext?.length || 0,
+      hasAttachments: !!attachments?.length
     });
     
     try {
-      logger.debug('ChatStore: Calling chat manager sendMessage', { nodeId });
-      const response = await state.chatManager.sendMessage(nodeId, message);
+      logger.debug('ChatStore: Calling chat manager sendMessage with attachments', { 
+        nodeId,
+        hasAttachments: !!attachments?.length,
+        attachmentsCount: attachments?.length || 0
+      });
+      
+      const response = await state.chatManager.sendMessage(nodeId, message, attachments);
       logger.info('ChatStore: Received response from chat manager', { 
         nodeId, 
         responseLength: response.length,
@@ -728,10 +740,58 @@ export const useChatStore = create<ChatState>((set, get) => ({
       type
     });
 
+    // Get conversation history up to source node for document inheritance
+    const pathToSource = get().getPathToNode(sourceNodeId);
+    
+    // Extract all documents from the conversation path for inheritance
+    const inheritedDocuments = pathToSource.reduce((docs: AttachmentData[], msg) => {
+      if (msg.attachments) {
+        msg.attachments.forEach(att => {
+          // Only inherit document types
+          const isDocument = att.type === 'application/pdf' || 
+                            att.type.startsWith('text/') || 
+                            att.type.includes('javascript') || 
+                            att.type.includes('python');
+          
+          if (isDocument) {
+            const docKey = `${att.name}:${att.type}`;
+            const alreadyExists = docs.some(doc => `${doc.name}:${doc.type}` === docKey);
+            
+            if (!alreadyExists) {
+              docs.push({
+                name: att.name,
+                type: att.type,
+                data: att.data,
+                previewUrl: att.previewUrl
+              });
+              
+              logger.debug('ChatStore: Document inherited for new branch', {
+                sourceNodeId,
+                newNodeId,
+                fileName: att.name,
+                fileType: att.type
+              });
+            }
+          }
+        });
+      }
+      return docs;
+    }, []);
+
+    logger.info('ChatStore: Document inheritance for branch', {
+      sourceNodeId,
+      newNodeId,
+      inheritedDocumentsCount: inheritedDocuments.length,
+      documentNames: inheritedDocuments.map(d => d.name)
+    });
+
     const newNode: Node<CustomNodeData> = {
       id: newNodeId,
       type: 'chatNode',
-      data: { label, chatHistory: [] },
+      data: { 
+        label, 
+        chatHistory: type === 'branch' ? [] : [] // Branch starts empty but will inherit documents via ChatManager
+      },
       position: { x: newX, y: newY },
     };
 
@@ -754,6 +814,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
         totalNodes: newState.nodes.length,
         totalEdges: newState.edges.length
       });
+
+      // If we have a chat manager and this is a branch, set up document inheritance
+      if (type === 'branch' && state.chatManager) {
+        logger.info('ChatStore: Setting up branch thread with document inheritance', {
+          sourceNodeId,
+          newNodeId,
+          pathToSourceLength: pathToSource.length
+        });
+        
+        // Create branch thread with document inheritance
+        state.chatManager.createBranchThread(sourceNodeId, newNodeId, pathToSource);
+      }
 
       return newState;
     });

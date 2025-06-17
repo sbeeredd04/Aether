@@ -21,6 +21,13 @@ export async function POST(req: NextRequest) {
       promptLength: prompt?.length || 0,
       historyLength: history?.length || 0,
       attachmentsCount: attachments?.length || 0,
+      attachmentTypes: attachments?.map((att: any) => att.type) || [],
+      documentAttachments: attachments?.filter((att: any) => 
+        att.type === 'application/pdf' || 
+        att.type.startsWith('text/') || 
+        att.type.includes('javascript') || 
+        att.type.includes('python')
+      ).length || 0,
       enableThinking,
       useStreaming,
       useGroundingPipeline: !!useGroundingPipeline

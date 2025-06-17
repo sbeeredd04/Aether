@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { FiRefreshCw, FiTrash2, FiPlus, FiX, FiFileText, FiChevronDown, FiChevronRight } from 'react-icons/fi';
-import { CustomNodeData, useChatStore, ChatMessage } from '../store/chatStore';
+import { CustomNodeData, useChatStore, ChatMessage, AttachmentData } from '../store/chatStore';
 import { SiGooglegemini } from 'react-icons/si';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
 import AudioPlayer from './AudioPlayer';
@@ -19,6 +19,9 @@ interface StreamingState {
   messagePhase: boolean;
   thoughtStartTime?: number;
   thoughtEndTime?: number;
+  groundingEnabled?: boolean;
+  useGroundingPipeline?: boolean;
+  modelSupportsThinking?: boolean;
   groundingMetadata?: {
     searchEntryPoint?: {
       renderedContent: string;
@@ -80,13 +83,49 @@ export default function NodeSidebar({
   isMobile = false,
   streamingState
 }: NodeSidebarProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
   const { getPathToNode, nodes, edges } = useChatStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set());
   const [thoughtTimings, setThoughtTimings] = useState<Map<number, number>>(new Map());
   
-  // Get all messages in the conversation thread from root to current node
-  const threadMessages = nodeId ? getFullConversationThread(nodeId) : [];
+  // Get all messages for this thread including inherited context
+  const threadMessages = useMemo(() => {
+    if (!nodeId) return [];
+    return getFullConversationThread(nodeId);
+  }, [nodeId, nodes, edges]);
+  
+  // Extract document context from thread messages
+  const documentContext = useMemo(() => {
+    const documents: AttachmentData[] = [];
+    const seenDocuments = new Set<string>();
+    
+    threadMessages.forEach(msg => {
+      if (msg.attachments) {
+        msg.attachments.forEach(att => {
+          const isDocument = att.type === 'application/pdf' || 
+                            att.type.startsWith('text/') || 
+                            att.type.includes('javascript') || 
+                            att.type.includes('python');
+          
+          if (isDocument) {
+            const docKey = `${att.name}:${att.type}`;
+            if (!seenDocuments.has(docKey)) {
+              seenDocuments.add(docKey);
+              documents.push(att);
+            }
+          }
+        });
+      }
+    });
+    
+    logger.debug('NodeSidebar: Document context extracted', {
+      nodeId,
+      documentCount: documents.length,
+      documentNames: documents.map(d => d.name)
+    });
+    
+    return documents;
+  }, [threadMessages, nodeId]);
   
   logger.debug('NodeSidebar: Component render', { 
     isOpen,
@@ -443,369 +482,450 @@ export default function NodeSidebar({
       } border border-white/10 shadow-xl sidebar-space-grotesk`} 
       style={{ width }}
     >
-      <div className={`${isMobile ? 'p-3' : 'p-4'} border-b border-white/10 flex-shrink-0`}>
-        <div className="flex items-center justify-between mb-1">
-          <h2 className={`font-semibold ${isMobile ? 'text-base' : 'text-lg'} text-white truncate group relative font-space-grotesk`}>
-            {data?.label || 'New Chat'}
-            {/* Tooltip for long titles */}
-            {data?.label && data.label.length > 30 && (
-              <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50 font-space-grotesk">
-                {data.label}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className={`flex-shrink-0 border-b border-white/10 ${isMobile ? 'p-3' : 'p-4'}`}>
+          <div className="flex items-center justify-between">
+            <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-white truncate`}>
+              {data.label}
+            </h2>
+            <button 
+              onClick={onClose}
+              className="text-white/60 hover:text-white transition-colors ml-2 flex-shrink-0"
+            >
+              <FiX size={isMobile ? 20 : 24} />
+            </button>
+          </div>
+          
+          {/* Document Context Indicator */}
+          {documentContext.length > 0 && (
+            <div className={`${isMobile ? 'mt-2' : 'mt-3'} flex flex-wrap gap-1`}>
+              <div className="flex items-center gap-1 text-blue-300/80 text-xs">
+                <FiFileText size={12} />
+                <span>{documentContext.length} document{documentContext.length > 1 ? 's' : ''} available</span>
               </div>
-            )}
-          </h2>
-          {!isMobile && (
-            <button onClick={onClose} className="hover:text-white text-gray-300 transition-colors" title="Close">
-              <FiX size={20} />
+              {documentContext.slice(0, 3).map((doc, idx) => (
+                <div key={idx} className="bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded text-xs truncate max-w-[120px]">
+                  {doc.name}
+                </div>
+              ))}
+              {documentContext.length > 3 && (
+                <div className="text-blue-300/60 text-xs">
+                  +{documentContext.length - 3} more
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className={`flex gap-2 ${isMobile ? 'px-3 py-2' : 'px-4 py-2'} border-b border-white/10 bg-black/20 ${
+          isMobile ? 'flex-wrap' : 'gap-3'
+        }`}>
+          {hasResponse && (
+            <button onClick={onBranch} className={`text-purple-300 hover:text-purple-200 flex items-center gap-1 font-space-grotesk ${
+              isMobile ? 'text-xs px-2 py-1 bg-purple-900/20 rounded' : ''
+            }`} title="Branch Chat">
+              <FiPlus size={isMobile ? 14 : 16} /> Branch
+            </button>
+          )}
+          <button onClick={onReset} className={`text-blue-300 hover:text-blue-200 flex items-center gap-1 font-space-grotesk ${
+            isMobile ? 'text-xs px-2 py-1 bg-blue-900/20 rounded' : ''
+          }`} title="Reset Node">
+            <FiRefreshCw size={isMobile ? 14 : 16} /> Reset
+          </button>
+          {!isRootNode && (
+            <button onClick={onDelete} className={`text-red-300 hover:text-red-200 flex items-center gap-1 font-space-grotesk ${
+              isMobile ? 'text-xs px-2 py-1 bg-red-900/20 rounded' : ''
+            }`} title="Delete Node">
+              <FiTrash2 size={isMobile ? 14 : 16} /> Delete
             </button>
           )}
         </div>
-        {data?.chatHistory.length > 0 && (
-          <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white/50 font-space-grotesk`}>
-            {data.chatHistory.length} messages in this conversation
-          </div>
-        )}
-      </div>
-      <div className={`flex gap-2 ${isMobile ? 'px-3 py-2' : 'px-4 py-2'} border-b border-white/10 bg-black/20 ${
-        isMobile ? 'flex-wrap' : 'gap-3'
-      }`}>
-        {hasResponse && (
-          <button onClick={onBranch} className={`text-purple-300 hover:text-purple-200 flex items-center gap-1 font-space-grotesk ${
-            isMobile ? 'text-xs px-2 py-1 bg-purple-900/20 rounded' : ''
-          }`} title="Branch Chat">
-            <FiPlus size={isMobile ? 14 : 16} /> Branch
-          </button>
-        )}
-        <button onClick={onReset} className={`text-blue-300 hover:text-blue-200 flex items-center gap-1 font-space-grotesk ${
-          isMobile ? 'text-xs px-2 py-1 bg-blue-900/20 rounded' : ''
-        }`} title="Reset Node">
-          <FiRefreshCw size={isMobile ? 14 : 16} /> Reset
-        </button>
-        {!isRootNode && (
-          <button onClick={onDelete} className={`text-red-300 hover:text-red-200 flex items-center gap-1 font-space-grotesk ${
-            isMobile ? 'text-xs px-2 py-1 bg-red-900/20 rounded' : ''
-          }`} title="Delete Node">
-            <FiTrash2 size={isMobile ? 14 : 16} /> Delete
-          </button>
-        )}
-      </div>
-      <div className={`flex-1 overflow-y-auto ${isMobile ? 'px-3' : 'px-4'} scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent`} style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}>
-        <div
-          ref={scrollRef}
-          className={`flex-1 overflow-y-auto ${isMobile ? 'px-2 py-4' : 'px-4 py-6'} space-y-3 scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent`}
-          style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}
-        >
-          {threadMessages.length > 0 ? (
-            threadMessages.map((msg, idx) => {
-              const isUser = msg.role === 'user';
-              const isModel = msg.role === 'model';
-              const isStreaming = isStreamingMessage(msg, idx);
-              
-              // Get content - either from streaming state or message content
-              let displayContent = msg.content;
-              if (isStreaming && streamingState?.isStreaming) {
-                displayContent = getStreamingContent();
-              }
-              
-              const contentHasMarkdown = isModel && hasMarkdown(displayContent);
-              const parsedContent = isModel ? parseThoughts(displayContent) : null;
-              const isThoughtsExpanded = expandedThoughts.has(idx);
-              
-              return (
-                <div
-                  key={idx}
-                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}
-                >
+        <div className={`flex-1 overflow-y-auto ${isMobile ? 'px-3' : 'px-4'} scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent`} style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}>
+          <div
+            ref={scrollRef}
+            className={`flex-1 overflow-y-auto ${isMobile ? 'px-2 py-4' : 'px-4 py-6'} space-y-3 scrollbar-thin scrollbar-thumb-white/80 scrollbar-track-transparent`}
+            style={{ scrollbarColor: 'rgba(255,255,255,0.8) transparent', scrollbarWidth: 'thin' }}
+          >
+            {threadMessages.length > 0 ? (
+              threadMessages.map((msg, idx) => {
+                const isUser = msg.role === 'user';
+                const isModel = msg.role === 'model';
+                const isStreaming = isStreamingMessage(msg, idx);
+                
+                // Get content - either from streaming state or message content
+                let displayContent = msg.content;
+                if (isStreaming && streamingState?.isStreaming) {
+                  displayContent = getStreamingContent();
+                }
+                
+                const contentHasMarkdown = isModel && hasMarkdown(displayContent);
+                const parsedContent = isModel ? parseThoughts(displayContent) : null;
+                const isThoughtsExpanded = expandedThoughts.has(idx);
+                
+                return (
                   <div
-                    className={`relative ${isMobile ? 'max-w-[90%]' : 'max-w-[80%]'} ${
-                      isMobile ? 'px-3 py-2' : 'px-4 py-3'
-                    } rounded-2xl shadow-md ${isMobile ? 'text-sm' : 'text-base'} font-normal transition-all backdrop-blur-sm
-                      ${isUser
-                        ? 'bg-purple-600/20 text-white border border-purple-400/30 ml-auto'
-                        : 'bg-white/5 text-white border border-white/10 mr-auto'}
-                      ${contentHasMarkdown ? 'markdown-message' : ''}
-                    `}
-                    style={{ minWidth: isMobile ? 40 : 60 }}
+                    key={idx}
+                    className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}
                   >
-                    {isModel && isGeminiModel((msg as any).modelId) && (
-                      <div className={`absolute ${isMobile ? '-top-4 -left-4' : '-top-5 -left-5'} flex items-center`} title={getModelName((msg as any).modelId)}>
-                        <span className="group-hover:scale-110 transition-transform cursor-pointer">
-                          <SiGooglegemini size={isMobile ? 18 : 22} className="text-blue-300 drop-shadow-md" />
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between mb-1">
-                      <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-gray-300/80 font-space-grotesk`}>
-                        {isUser ? 'You' : getModelName((msg as any).modelId)}
-                      </div>
-                      {/* Copy button for both user and model responses */}
-                      {(isUser || (isModel && displayContent)) && (
-                        <CopyButton 
-                          content={isUser ? msg.content : (parsedContent?.hasThoughts ? parsedContent.answer || displayContent : displayContent)} 
-                          size={isMobile ? 10 : 12} 
-                          className="opacity-60 hover:opacity-100"
-                        />
+                    <div
+                      className={`relative ${isMobile ? 'max-w-[90%]' : 'max-w-[80%]'} ${
+                        isMobile ? 'px-3 py-2' : 'px-4 py-3'
+                      } rounded-2xl shadow-md ${isMobile ? 'text-sm' : 'text-base'} font-normal transition-all backdrop-blur-sm
+                        ${isUser
+                          ? 'bg-purple-600/20 text-white border border-purple-400/30 ml-auto'
+                          : 'bg-white/5 text-white border border-white/10 mr-auto'}
+                        ${contentHasMarkdown ? 'markdown-message' : ''}
+                      `}
+                      style={{ minWidth: isMobile ? 40 : 60 }}
+                    >
+                      {isModel && isGeminiModel((msg as any).modelId) && (
+                        <div className={`absolute ${isMobile ? '-top-4 -left-4' : '-top-5 -left-5'} flex items-center`} title={getModelName((msg as any).modelId)}>
+                          <span className="group-hover:scale-110 transition-transform cursor-pointer">
+                            <SiGooglegemini size={isMobile ? 18 : 22} className="text-blue-300 drop-shadow-md" />
+                          </span>
+                        </div>
                       )}
-                    </div>
-
-                    {msg.attachments && msg.attachments.length > 0 && (
-                      <div className="mb-2 flex flex-wrap gap-2">
-                        {msg.attachments.map((att, attIdx) => (
-                          <div key={attIdx} className="bg-black/20 p-1 rounded-md">
-                            {att.type.startsWith('image/') ? (
-                              <img 
-                                src={att.previewUrl || `data:${att.type};base64,${att.data}`} 
-                                alt={att.name} 
-                                className={`${isMobile ? 'max-w-[120px] max-h-[120px]' : 'max-w-[150px] max-h-[150px]'} rounded cursor-pointer hover:scale-105 transition-transform`} 
-                                onClick={() => onImageClick && onImageClick(
-                                  att.previewUrl || `data:${att.type};base64,${att.data}`,
-                                  att.name
-                                )}
-                              />
-                            ) : att.type.startsWith('audio/') ? (
-                              <AudioPlayer
-                                audioSrc={att.previewUrl || `data:${att.type};base64,${att.data}`}
-                                fileName={att.name}
-                                mimeType={att.type}
-                                className={`w-full ${isMobile ? 'max-w-[200px]' : 'max-w-[250px]'}`}
-                              />
-                            ) : (
-                              <div className="flex items-center gap-2 text-white p-2 w-full max-w-[200px]">
-                                <FiFileText />
-                                <span className={`${isMobile ? 'text-xs' : 'text-sm'} truncate`}>{att.name}</span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Thoughts dropdown for model messages */}
-                    {isModel && (parsedContent?.hasThoughts || (isStreaming && streamingState?.currentThoughts)) && (
-                      <div className="mb-2">
-                        {isStreaming && streamingState?.currentThoughts ? (
-                          // Streaming thoughts dropdown
-                          <div className="mb-2">
-                            <button
-                              onClick={() => toggleStreamingThoughts()}
-                              className={`flex items-start gap-2 ${isMobile ? 'text-sm' : 'text-base'} text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk w-full text-left`}
-                            >
-                              <div className="flex-shrink-0 mt-1">
-                                {isStreamingThoughtsExpanded ? <FiChevronDown size={isMobile ? 14 : 16} /> : <FiChevronRight size={isMobile ? 14 : 16} />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 text-white/90 leading-relaxed">
-                                  {streamingState.isThinkingPhase ? (
-                                    <>
-                                      <span className="font-semibold text-blue-300">Thinking</span>
-                                      <div className="flex gap-1 mr-2">
-                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
-                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:200ms]"></div>
-                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:400ms]"></div>
-                                      </div>
-                                      <span className="flex-1">
-                                        {getThoughtTitle(streamingState.currentThoughts, true)}
-                                      </span>
-                                    </>
-                                  ) : null}
-                                </div>
-                                {!streamingState.isThinkingPhase && (() => {
-                                  const duration = getStreamingThoughtDuration();
-                                  return duration > 0 ? (
-                                    <div className="text-blue-400/70 text-sm mt-2 flex items-center gap-1">
-                                      <span>thought for {duration} second{duration !== 1 ? 's' : ''}</span>
-                                      <span className="text-blue-400">●</span>
-                                    </div>
-                                  ) : null;
-                                })()}
-                              </div>
-                            </button>
-                            {isStreamingThoughtsExpanded && (
-                              <div className={`mt-3 mb-3 ${isMobile ? 'p-3' : 'p-4'} bg-black/20 rounded-lg border border-blue-500/20`}>
-                                <div className={`${isMobile ? 'text-sm' : 'text-base'} text-white/90 font-space-grotesk leading-relaxed`}>
-                                  {hasMarkdown(streamingState.currentThoughts) ? (
-                                    <div className="markdown-content font-space-grotesk">
-                                      <MarkdownRenderer content={cleanMarkdownContent(streamingState.currentThoughts)} />
-                                    </div>
-                                  ) : (
-                                    <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(streamingState.currentThoughts)}</div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          // Completed thoughts dropdown
-                          <>
-                        <button
-                          onClick={() => toggleThoughts(idx)}
-                              className={`flex items-start gap-2 ${isMobile ? 'text-sm' : 'text-base'} text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk w-full text-left`}
-                            >
-                              <div className="flex-shrink-0 mt-0.5">
-                                {isThoughtsExpanded ? <FiChevronDown size={isMobile ? 14 : 16} /> : <FiChevronRight size={isMobile ? 14 : 16} />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                {(() => {
-                                  const duration = getThoughtDuration(idx);
-                                  return (
-                                    <div className="text-blue-400/90 flex items-center gap-1 leading-relaxed">
-                                      <span>Thought for {duration}s</span>
-                                      <span className="text-blue-400">●</span>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                        </button>
-                        {isThoughtsExpanded && (
-                              <div className={`mt-3 mb-3 ${isMobile ? 'p-3' : 'p-4'} bg-black/20 rounded-lg border border-blue-500/20`}>
-                                <div className={`${isMobile ? 'text-sm' : 'text-base'} font-semibold text-blue-300 mb-3 font-space-grotesk`}>
-                                  Full Thought Process:
-                                </div>
-                                <div className={`${isMobile ? 'text-sm' : 'text-base'} text-white/90 font-space-grotesk leading-relaxed`}>
-                                  {hasMarkdown(parsedContent!.thoughts) ? (
-                                    <div className="markdown-content font-space-grotesk">
-                                      <MarkdownRenderer content={cleanMarkdownContent(parsedContent!.thoughts)} />
-                                </div>
-                              ) : (
-                                    <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent!.thoughts)}</div>
-                              )}
-                            </div>
-                          </div>
-                            )}
-                          </>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-gray-300/80 font-space-grotesk`}>
+                          {isUser ? 'You' : getModelName((msg as any).modelId)}
+                        </div>
+                        {/* Copy button for both user and model responses */}
+                        {(isUser || (isModel && displayContent)) && (
+                          <CopyButton 
+                            content={isUser ? msg.content : (parsedContent?.hasThoughts ? parsedContent.answer || displayContent : displayContent)} 
+                            size={isMobile ? 10 : 12} 
+                            className="opacity-60 hover:opacity-100"
+                          />
                         )}
                       </div>
-                    )}
-                    
-                    {/* Message content */}
-                    {isStreaming ? (
-                      <StreamingContent content={displayContent} />
-                    ) : (
-                      isModel && parsedContent?.hasThoughts ? (
-                      // Show only the answer part if thoughts are present
-                      parsedContent.answer && (contentHasMarkdown ? (
-                        <div className="markdown-content font-space-grotesk">
-                          <MarkdownRenderer content={cleanMarkdownContent(parsedContent.answer)} />
-                        </div>
-                      ) : (
-                        <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.answer)}</div>
-                      ))
-                    ) : (
-                      // Show full content for non-thinking responses
-                      isModel && contentHasMarkdown ? (
-                        <div className="markdown-content font-space-grotesk">
-                            <MarkdownRenderer content={cleanMarkdownContent(displayContent)} />
-                        </div>
-                      ) : (
-                          <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(displayContent)}</div>
-                        )
-                      )
-                    )}
 
-                    {/* Citations and search suggestions for model responses */}
-                    {isModel && (msg as any).groundingMetadata && !isStreaming && (() => {
-                      console.log('🔍 NODESIDEBAR DEBUG: Rendering citations for completed message', {
-                        messageIndex: idx,
-                        nodeId: nodeId,
-                        groundingMetadata: (msg as any).groundingMetadata,
-                        citationsCount: (msg as any).groundingMetadata.citations?.length || 0,
-                        searchQueriesCount: (msg as any).groundingMetadata.webSearchQueries?.length || 0,
-                        hasSearchEntryPoint: !!(msg as any).groundingMetadata.searchEntryPoint?.renderedContent
-                      });
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-2">
+                          {msg.attachments.map((att, attIdx) => (
+                            <div key={attIdx} className="bg-black/20 p-1 rounded-md">
+                              {att.type.startsWith('image/') ? (
+                                <img 
+                                  src={att.previewUrl || `data:${att.type};base64,${att.data}`} 
+                                  alt={att.name} 
+                                  className={`${isMobile ? 'max-w-[120px] max-h-[120px]' : 'max-w-[150px] max-h-[150px]'} rounded cursor-pointer hover:scale-105 transition-transform`} 
+                                  onClick={() => onImageClick && onImageClick(
+                                    att.previewUrl || `data:${att.type};base64,${att.data}`,
+                                    att.name
+                                  )}
+                                />
+                              ) : att.type.startsWith('audio/') ? (
+                                <AudioPlayer
+                                  audioSrc={att.previewUrl || `data:${att.type};base64,${att.data}`}
+                                  fileName={att.name}
+                                  mimeType={att.type}
+                                  className={`w-full ${isMobile ? 'max-w-[200px]' : 'max-w-[250px]'}`}
+                                />
+                              ) : att.type === 'application/pdf' ? (
+                                <div className={`flex items-center gap-2 text-white p-2 w-full ${isMobile ? 'max-w-[200px]' : 'max-w-[250px]'} bg-red-600/20 rounded`}>
+                                  <div className="flex flex-col items-center justify-center text-red-300">
+                                    <FiFileText size={isMobile ? 20 : 24} />
+                                    <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold`}>PDF</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <span className={`${isMobile ? 'text-xs' : 'text-sm'} truncate block text-red-200`}>{att.name}</span>
+                                    <span className={`${isMobile ? 'text-xs' : 'text-sm'} text-red-300/70`}>Document</span>
+                                  </div>
+                                </div>
+                              ) : att.type.startsWith('text/') || att.type.includes('javascript') || att.type.includes('python') ? (
+                                <div className={`flex items-center gap-2 text-white p-2 w-full ${isMobile ? 'max-w-[200px]' : 'max-w-[250px]'} bg-blue-600/20 rounded`}>
+                                  <div className="flex flex-col items-center justify-center text-blue-300">
+                                    <FiFileText size={isMobile ? 20 : 24} />
+                                    <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold`}>
+                                      {att.type.includes('javascript') ? 'JS' : 
+                                       att.type.includes('python') ? 'PY' : 
+                                       att.type.includes('html') ? 'HTML' :
+                                       att.type.includes('css') ? 'CSS' :
+                                       att.type.includes('markdown') ? 'MD' :
+                                       att.type.includes('csv') ? 'CSV' :
+                                       att.type.includes('xml') ? 'XML' :
+                                       'TXT'}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <span className={`${isMobile ? 'text-xs' : 'text-sm'} truncate block text-blue-200`}>{att.name}</span>
+                                    <span className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300/70`}>
+                                      {att.type.includes('javascript') ? 'JavaScript' : 
+                                       att.type.includes('python') ? 'Python' : 
+                                       att.type.includes('html') ? 'HTML Document' :
+                                       att.type.includes('css') ? 'CSS Stylesheet' :
+                                       att.type.includes('markdown') ? 'Markdown' :
+                                       att.type.includes('csv') ? 'CSV Data' :
+                                       att.type.includes('xml') ? 'XML Document' :
+                                       'Text File'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-white p-2 w-full max-w-[200px]">
+                                  <FiFileText />
+                                  <span className={`${isMobile ? 'text-xs' : 'text-sm'} truncate`}>{att.name}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       
-                      return (
-                      <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
-                        <Citations
-                          citations={(msg as any).groundingMetadata.citations}
-                          searchQueries={(msg as any).groundingMetadata.webSearchQueries}
-                          searchEntryPoint={(msg as any).groundingMetadata.searchEntryPoint?.renderedContent}
-                          className={isMobile ? 'text-xs' : 'text-sm'}
-                          enableMarkdown={true}
-                        />
-                      </div>
-                      );
-                    })()}
-
-                    {/* Streaming grounding metadata display */}
-                    {isModel && isStreaming && (() => {
-                      // Check for grounding-related content
-                      const hasGroundingMetadata = !!streamingState?.groundingMetadata?.citations;
-                      const hasLoadingMessage = !!streamingState?.groundingMetadata?.loadingMessage;
-                      const isGroundingEnabled = (msg as any).modelId?.includes('web') || 
-                                                (msg as any).modelId?.includes('grounding') || 
-                                                (msg as any).modelId?.includes('thinking') ||
-                                                streamingState?.isStreaming; // Show for any streaming model that might use grounding
-                      
-                      // Show loading state if we have a loading message or if grounding is enabled but no metadata yet
-                      if ((hasLoadingMessage || (!hasGroundingMetadata && isGroundingEnabled)) && streamingState?.isStreaming) {
-                        const loadingText = streamingState?.groundingMetadata?.loadingMessage || 'Searching the web...';
-                        
-                        console.log('🔍 NODESIDEBAR DEBUG: Showing web search loading state', {
-                          messageIndex: idx,
-                          nodeId: nodeId,
-                          isStreaming: streamingState.isStreaming,
-                          hasGroundingMetadata,
-                          hasLoadingMessage,
-                          isGroundingEnabled,
-                          loadingText,
-                          modelId: (msg as any).modelId
-                        });
-                        
-                        return (
-                          <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
-                            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
-                              <div className="flex gap-1">
-                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]"></div>
-                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:150ms]"></div>
-                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
+                      {/* Thoughts dropdown for model messages */}
+                      {isModel && (parsedContent?.hasThoughts || (isStreaming && streamingState?.currentThoughts)) && (
+                        <div className="mb-2">
+                          {isStreaming && streamingState?.currentThoughts ? (
+                            // Streaming thoughts dropdown
+                            <div className="mb-2">
+                              <button
+                                onClick={() => toggleStreamingThoughts()}
+                                className={`flex items-start gap-2 ${isMobile ? 'text-sm' : 'text-base'} text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk w-full text-left`}
+                              >
+                                <div className="flex-shrink-0 mt-1">
+                                  {isStreamingThoughtsExpanded ? <FiChevronDown size={isMobile ? 14 : 16} /> : <FiChevronRight size={isMobile ? 14 : 16} />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 text-white/90 leading-relaxed">
+                                    {streamingState.isThinkingPhase ? (
+                                      <>
+                                        <span className="font-semibold text-blue-300">Thinking</span>
+                                        <div className="flex gap-1 mr-2">
+                                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+                                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:200ms]"></div>
+                                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:400ms]"></div>
+                                        </div>
+                                        <span className="flex-1">
+                                          {getThoughtTitle(streamingState.currentThoughts, true)}
+                                        </span>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                  {!streamingState.isThinkingPhase && (() => {
+                                    const duration = getStreamingThoughtDuration();
+                                    return duration > 0 ? (
+                                      <div className="text-blue-400/70 text-sm mt-2 flex items-center gap-1">
+                                        <span>thought for {duration} second{duration !== 1 ? 's' : ''}</span>
+                                        <span className="text-blue-400">●</span>
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                </div>
+                              </button>
+                              {isStreamingThoughtsExpanded && (
+                                <div className={`mt-3 mb-3 ${isMobile ? 'p-3' : 'p-4'} bg-black/20 rounded-lg border border-blue-500/20`}>
+                                  <div className={`${isMobile ? 'text-sm' : 'text-base'} text-white/90 font-space-grotesk leading-relaxed`}>
+                                    {hasMarkdown(streamingState.currentThoughts) ? (
+                                      <div className="markdown-content font-space-grotesk">
+                                        <MarkdownRenderer content={cleanMarkdownContent(streamingState.currentThoughts)} />
+                                      </div>
+                                    ) : (
+                                      <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(streamingState.currentThoughts)}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            // Completed thoughts dropdown
+                            <>
+                          <button
+                            onClick={() => toggleThoughts(idx)}
+                                className={`flex items-start gap-2 ${isMobile ? 'text-sm' : 'text-base'} text-blue-300 hover:text-blue-200 transition-colors font-space-grotesk w-full text-left`}
+                              >
+                                <div className="flex-shrink-0 mt-0.5">
+                                  {isThoughtsExpanded ? <FiChevronDown size={isMobile ? 14 : 16} /> : <FiChevronRight size={isMobile ? 14 : 16} />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {(() => {
+                                    const duration = getThoughtDuration(idx);
+                                    return (
+                                      <div className="text-blue-400/90 flex items-center gap-1 leading-relaxed">
+                                        <span>thought for {duration}s</span>
+                                        <span className="text-blue-400">●</span>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                          </button>
+                          {isThoughtsExpanded && (
+                                <div className={`mt-3 mb-3 ${isMobile ? 'p-3' : 'p-4'} bg-black/20 rounded-lg border border-blue-500/20`}>
+                                  <div className={`${isMobile ? 'text-sm' : 'text-base'} font-semibold text-blue-300 mb-3 font-space-grotesk`}>
+                                    Full Thought Process:
+                                  </div>
+                                  <div className={`${isMobile ? 'text-sm' : 'text-base'} text-white/90 font-space-grotesk leading-relaxed`}>
+                                    {hasMarkdown(parsedContent!.thoughts) ? (
+                                  <div className="markdown-content font-space-grotesk">
+                                        <MarkdownRenderer content={cleanMarkdownContent(parsedContent!.thoughts)} />
+                                  </div>
+                                ) : (
+                                      <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent!.thoughts)}</div>
+                                  )}
                               </div>
-                              {loadingText}
                             </div>
-                          </div>
-                        );
-                      }
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                       
-                      // Show actual grounding metadata if available
-                      if (hasGroundingMetadata && streamingState?.groundingMetadata) {
-                        console.log('🔍 NODESIDEBAR DEBUG: Rendering citations for streaming message', {
+                      {/* Message content */}
+                      {isStreaming ? (
+                        <StreamingContent content={displayContent} />
+                      ) : (
+                        isModel && parsedContent?.hasThoughts ? (
+                        // Show only the answer part if thoughts are present
+                        parsedContent.answer && (contentHasMarkdown ? (
+                          <div className="markdown-content font-space-grotesk">
+                            <MarkdownRenderer content={cleanMarkdownContent(parsedContent.answer)} />
+                          </div>
+                        ) : (
+                          <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(parsedContent.answer)}</div>
+                        ))
+                      ) : (
+                        // Show full content for non-thinking responses
+                        isModel && contentHasMarkdown ? (
+                          <div className="markdown-content font-space-grotesk">
+                              <MarkdownRenderer content={cleanMarkdownContent(displayContent)} />
+                          </div>
+                        ) : (
+                            <div className="whitespace-pre-wrap font-space-grotesk">{cleanMarkdownContent(displayContent)}</div>
+                          )
+                        )
+                      )}
+
+                      {/* Citations and search suggestions for model responses */}
+                      {isModel && (msg as any).groundingMetadata && !isStreaming && (() => {
+                        console.log('🔍 NODESIDEBAR DEBUG: Rendering citations for completed message', {
                           messageIndex: idx,
                           nodeId: nodeId,
-                          streamingGroundingMetadata: streamingState.groundingMetadata,
-                          citationsCount: streamingState.groundingMetadata.citations?.length || 0,
-                          searchQueriesCount: streamingState.groundingMetadata.webSearchQueries?.length || 0,
-                          hasSearchEntryPoint: !!streamingState.groundingMetadata.searchEntryPoint?.renderedContent,
-                          isStreaming: streamingState.isStreaming
+                          groundingMetadata: (msg as any).groundingMetadata,
+                          citationsCount: (msg as any).groundingMetadata.citations?.length || 0,
+                          searchQueriesCount: (msg as any).groundingMetadata.webSearchQueries?.length || 0,
+                          hasSearchEntryPoint: !!(msg as any).groundingMetadata.searchEntryPoint?.renderedContent
                         });
                         
                         return (
-                          <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
-                            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
-                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                              Web search results
-                            </div>
-                            <Citations
-                              citations={streamingState.groundingMetadata.citations}
-                              searchQueries={streamingState.groundingMetadata.webSearchQueries}
-                              searchEntryPoint={streamingState.groundingMetadata.searchEntryPoint?.renderedContent}
-                              className={isMobile ? 'text-xs' : 'text-sm'}
-                              enableMarkdown={true}
-                            />
-                          </div>
+                        <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
+                          <Citations
+                            citations={(msg as any).groundingMetadata.citations}
+                            searchQueries={(msg as any).groundingMetadata.webSearchQueries}
+                            searchEntryPoint={(msg as any).groundingMetadata.searchEntryPoint?.renderedContent}
+                            className={isMobile ? 'text-xs' : 'text-sm'}
+                            enableMarkdown={true}
+                          />
+                        </div>
                         );
-                      }
-                      
-                      return null;
-                    })()}
+                      })()}
+
+                      {/* Streaming grounding metadata display */}
+                      {isModel && isStreaming && (() => {
+                        // Check for grounding-related content
+                        const hasGroundingMetadata = !!streamingState?.groundingMetadata?.citations;
+                        const hasLoadingMessage = !!streamingState?.groundingMetadata?.loadingMessage;
+                        
+                        // Determine if grounding is actually enabled for this request
+                        const isActuallyGroundingEnabled = streamingState?.groundingEnabled === true;
+                        const isUsingGroundingPipeline = streamingState?.useGroundingPipeline === true;
+                        const modelSupportsThinking = streamingState?.modelSupportsThinking === true;
+                        
+                        // Show loading state based on actual pipeline configuration
+                        if (hasLoadingMessage && streamingState?.isStreaming) {
+                          // Show specific loading message from the grounding pipeline
+                          const loadingText = streamingState.groundingMetadata?.loadingMessage;
+                          
+                          console.log('🔍 NODESIDEBAR DEBUG: Showing specific loading state from pipeline', {
+                            messageIndex: idx,
+                            nodeId: nodeId,
+                            isStreaming: streamingState.isStreaming,
+                            hasGroundingMetadata,
+                            hasLoadingMessage,
+                            isActuallyGroundingEnabled,
+                            isUsingGroundingPipeline,
+                            loadingText,
+                            modelId: (msg as any).modelId
+                          });
+                          
+                          return (
+                            <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
+                              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
+                                <div className="flex gap-1">
+                                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]"></div>
+                                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:150ms]"></div>
+                                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
+                                </div>
+                                {loadingText}
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        // Show general thinking loading state for thinking models without grounding
+                        if (!hasLoadingMessage && !hasGroundingMetadata && modelSupportsThinking && !isActuallyGroundingEnabled && streamingState?.isStreaming) {
+                          console.log('🔍 NODESIDEBAR DEBUG: Showing thinking-only loading state', {
+                            messageIndex: idx,
+                            nodeId: nodeId,
+                            isStreaming: streamingState.isStreaming,
+                            modelSupportsThinking,
+                            isActuallyGroundingEnabled,
+                            modelId: (msg as any).modelId
+                          });
+                          
+                          return (
+                            <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
+                              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-purple-300 mb-2 flex items-center gap-2`}>
+                                <div className="flex gap-1">
+                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0ms]"></div>
+                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:150ms]"></div>
+                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
+                                </div>
+                                Thinking...
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        // Show actual grounding metadata if available
+                        if (hasGroundingMetadata && streamingState?.groundingMetadata) {
+                          console.log('🔍 NODESIDEBAR DEBUG: Rendering citations for streaming message', {
+                            messageIndex: idx,
+                            nodeId: nodeId,
+                            streamingGroundingMetadata: streamingState.groundingMetadata,
+                            citationsCount: streamingState.groundingMetadata.citations?.length || 0,
+                            searchQueriesCount: streamingState.groundingMetadata.webSearchQueries?.length || 0,
+                            hasSearchEntryPoint: !!streamingState.groundingMetadata.searchEntryPoint?.renderedContent,
+                            isStreaming: streamingState.isStreaming
+                          });
+                          
+                          return (
+                            <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
+                              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
+                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                Web search results
+                              </div>
+                              <Citations
+                                citations={streamingState.groundingMetadata.citations}
+                                searchQueries={streamingState.groundingMetadata.webSearchQueries}
+                                searchEntryPoint={streamingState.groundingMetadata.searchEntryPoint?.renderedContent}
+                                className={isMobile ? 'text-xs' : 'text-sm'}
+                                enableMarkdown={true}
+                              />
+                            </div>
+                          );
+                        }
+                        
+                        return null;
+                      })()}
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className={`text-center text-gray-400 ${isMobile ? 'py-6' : 'py-8'} font-space-grotesk`}>No messages in this conversation yet</div>
-          )}
-          
-          {/* Bottom margin for conversation */}
-          <div className={isMobile ? 'h-6' : 'h-8'}></div>
+                );
+              })
+            ) : (
+              <div className={`text-center text-gray-400 ${isMobile ? 'py-6' : 'py-8'} font-space-grotesk`}>No messages in this conversation yet</div>
+            )}
+            
+            {/* Bottom margin for conversation */}
+            <div className={isMobile ? 'h-6' : 'h-8'}></div>
+          </div>
         </div>
       </div>
     </div>

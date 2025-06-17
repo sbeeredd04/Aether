@@ -19,7 +19,7 @@ interface PromptBarProps {
   onClearVoiceTranscript?: () => void;
   isMobile?: boolean;
   // Streaming callbacks
-  onStreamingStart?: () => void;
+  onStreamingStart?: (config: { groundingEnabled: boolean; useGroundingPipeline: boolean; modelSupportsThinking: boolean; }) => void;
   onStreamingThought?: (thought: string) => void;
   onStreamingMessage?: (messageChunk: string) => void;
   onStreamingGrounding?: (metadata: any) => void;
@@ -66,10 +66,13 @@ export default function PromptBar({
 
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [selectedModel, setSelectedModel] = useState(models[0].id);
+  const [selectedModel, setSelectedModel] = useState(models[0].id); // Default to first model (Web + Thinking)
   const [enableThinking, setEnableThinking] = useState(true);
   const [ttsOptions, setTtsOptions] = useState<TTSOptions>({});
-  const [grounding, setGrounding] = useState<GroundingOptions>({ enabled: false, dynamicThreshold: 0.3 });
+  const [grounding, setGrounding] = useState<GroundingOptions>({ 
+    enabled: models[0]?.useGroundingPipeline || false, // Enable grounding for Web + Thinking by default
+    dynamicThreshold: 0.3 
+  });
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(!isMobile);
   const [isRecording, setIsRecording] = useState(false);
   
@@ -129,6 +132,7 @@ export default function PromptBar({
   const supportsThinking = selectedModelDef?.isThinking;
   const supportsGrounding = selectedModelDef?.supportsGrounding;
   const supportsAudioInput = selectedModelDef?.supportedInputs.includes('audio');
+  const supportsDocuments = selectedModelDef?.supportsDocuments;
   
   logger.debug('PromptBar: Model capabilities analysis', {
     selectedModel,
@@ -514,8 +518,13 @@ export default function PromptBar({
           throw new Error('No response body for streaming');
         }
 
-        // Notify that streaming started
-        onStreamingStart?.();
+        // Notify that streaming started with configuration
+        const streamingConfig = {
+          groundingEnabled: grounding.enabled,
+          useGroundingPipeline: !!currentModel?.useGroundingPipeline,
+          modelSupportsThinking: !!supportsThinking
+        };
+        onStreamingStart?.(streamingConfig);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -974,19 +983,38 @@ export default function PromptBar({
             <div className={`${isMobile ? 'mb-2' : 'mb-3'} flex flex-wrap ${isMobile ? 'gap-1' : 'gap-2'}`}>
               {attachments.map((att, index) => (
                 <div key={index} className="relative group bg-neutral-700/60 rounded-lg p-1">
-                   {att.file.type.startsWith('image/') ? (
+                  {att.file.type.startsWith('image/') ? (
                     <img src={att.previewUrl} alt={att.file.name} className={`${isMobile ? 'h-12 w-12' : 'h-16 w-16'} object-cover rounded-md`} />
-                   ) : att.file.type.startsWith('audio/') ? (
+                  ) : att.file.type.startsWith('audio/') ? (
                     <div className={`${isMobile ? 'h-12 w-20' : 'h-16 w-24'} flex flex-col items-center justify-center text-white p-1 rounded-md`}>
                       <FiVolume2 size={isMobile ? 16 : 20} />
                       <span className={`${isMobile ? 'text-xs' : 'text-xs'} truncate w-full text-center mt-1`}>{att.file.name}</span>
                     </div>
-                   ) : (
+                  ) : att.file.type === 'application/pdf' ? (
+                    <div className={`${isMobile ? 'h-12 w-20' : 'h-16 w-24'} flex flex-col items-center justify-center text-white p-1 rounded-md bg-red-600/20`}>
+                      <FiFileText size={isMobile ? 16 : 20} className="text-red-300" />
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} truncate w-full text-center mt-1 text-red-200`}>PDF</span>
+                    </div>
+                  ) : att.file.type.startsWith('text/') || att.file.type.includes('javascript') || att.file.type.includes('python') ? (
+                    <div className={`${isMobile ? 'h-12 w-20' : 'h-16 w-24'} flex flex-col items-center justify-center text-white p-1 rounded-md bg-blue-600/20`}>
+                      <FiFileText size={isMobile ? 16 : 20} className="text-blue-300" />
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} truncate w-full text-center mt-1 text-blue-200`}>
+                        {att.file.type.includes('javascript') ? 'JS' : 
+                         att.file.type.includes('python') ? 'PY' : 
+                         att.file.type.includes('html') ? 'HTML' :
+                         att.file.type.includes('css') ? 'CSS' :
+                         att.file.type.includes('markdown') ? 'MD' :
+                         att.file.type.includes('csv') ? 'CSV' :
+                         att.file.type.includes('xml') ? 'XML' :
+                         'TXT'}
+                      </span>
+                    </div>
+                  ) : (
                     <div className={`${isMobile ? 'h-12 w-20' : 'h-16 w-24'} flex flex-col items-center justify-center text-white p-1 rounded-md`}>
                       <FiPaperclip size={isMobile ? 16 : 20} />
                       <span className={`${isMobile ? 'text-xs' : 'text-xs'} truncate w-full text-center mt-1`}>{att.file.name}</span>
                     </div>
-                   )}
+                  )}
                   <button onClick={() => removeAttachment(index)} className={`absolute ${isMobile ? '-top-1 -right-1' : '-top-1.5 -right-1.5'} bg-gray-800 hover:bg-gray-700 rounded-full ${isMobile ? 'p-0.5' : 'p-0.5'} text-white opacity-0 group-hover:opacity-100 transition-opacity`}>
                     <FiX size={isMobile ? 12 : 14} />
                   </button>
@@ -1050,7 +1078,7 @@ export default function PromptBar({
               multiple 
               hidden
               onChange={handleFileChange}
-              accept="image/png, image/jpeg, image/webp, image/heic, image/heif, application/pdf"
+              accept="image/png, image/jpeg, image/webp, image/heic, image/heif, application/pdf, text/plain, text/html, text/css, text/markdown, text/csv, text/xml, text/rtf, application/x-javascript, text/javascript, application/x-python, text/x-python"
             />
             
             {supportsAudioInput && (
@@ -1087,9 +1115,26 @@ export default function PromptBar({
                     modelDef: models.find(m => m.id === newModel)
                   });
                   setSelectedModel(newModel);
-                  // Reset options when model changes
-                  setEnableThinking(true);
-                  setGrounding({ enabled: false, dynamicThreshold: 0.3 });
+                  
+                  // Get new model definition to set appropriate defaults
+                  const newModelDef = models.find(m => m.id === newModel);
+                  
+                  // Reset thinking toggle based on model support
+                  setEnableThinking(!!newModelDef?.isThinking);
+                  
+                  // Reset grounding toggle based on model support and pipeline usage
+                  if (newModelDef?.useGroundingPipeline) {
+                    // For models that use grounding pipeline, enable grounding by default
+                    setGrounding({ enabled: true, dynamicThreshold: 0.3 });
+                  } else if (newModelDef?.supportsGrounding) {
+                    // For models that support direct grounding, keep it disabled by default
+                    setGrounding({ enabled: false, dynamicThreshold: 0.3 });
+                  } else {
+                    // For models that don't support grounding, disable it
+                    setGrounding({ enabled: false, dynamicThreshold: 0.3 });
+                  }
+                  
+                  // Reset TTS options
                   setTtsOptions({});
                 }}
                 className={`bg-transparent ${isMobile ? 'text-xs' : 'text-sm'} text-white/80 outline-none border-none pr-2 ${

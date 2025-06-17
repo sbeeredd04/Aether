@@ -21,6 +21,13 @@ export async function POST(req: NextRequest) {
       promptLength: prompt?.length || 0,
       historyLength: history?.length || 0,
       attachmentsCount: attachments?.length || 0,
+      attachmentTypes: attachments?.map((att: any) => att.type) || [],
+      documentAttachments: attachments?.filter((att: any) => 
+        att.type === 'application/pdf' || 
+        att.type.startsWith('text/') || 
+        att.type.includes('javascript') || 
+        att.type.includes('python')
+      ).length || 0,
       enableThinking,
       useStreaming,
       useGroundingPipeline: !!useGroundingPipeline
@@ -50,9 +57,10 @@ export async function POST(req: NextRequest) {
       const streamResponse = new ReadableStream({
         async start(controller) {
           try {
-            // Determine which streaming method to use
+            // Determine which streaming method to use based on model and toggles
             let streamGenerator;
             
+            // Check if model uses grounding pipeline AND grounding is enabled
             if (useGroundingPipeline && grounding?.enabled) {
               console.log(`🔍 API STREAMING DEBUG: Using streaming grounding pipeline`, {
                 requestId,
@@ -77,9 +85,13 @@ export async function POST(req: NextRequest) {
               console.log(`🔍 API STREAMING DEBUG: Using standard streaming`, {
                 requestId,
                 modelId,
-                useGroundingPipeline,
-                groundingEnabled: grounding?.enabled
+                useGroundingPipeline: !!useGroundingPipeline,
+                groundingEnabled: grounding?.enabled,
+                reason: !useGroundingPipeline ? "Model doesn't use grounding pipeline" : "Grounding not enabled"
               });
+              
+              // Use standard streaming - only pass grounding if model supports it directly
+              const modelSupportsDirectGrounding = !useGroundingPipeline && grounding?.enabled;
               
               streamGenerator = generateContentStream(
                 apiKey,
@@ -88,7 +100,7 @@ export async function POST(req: NextRequest) {
                 modelId,
                 attachments,
                 ttsOptions,
-                grounding,
+                modelSupportsDirectGrounding ? grounding : undefined, // Only pass grounding for direct support
                 enableThinking
               );
             }
@@ -176,7 +188,7 @@ export async function POST(req: NextRequest) {
     serverLogger.info('API: Non-streaming request', { requestId, modelId });
     let result: any;
 
-    // Check if grounding pipeline should be used
+    // Check if grounding pipeline should be used based on model and toggles
     if (useGroundingPipeline && grounding?.enabled) {
       console.log(`🔍 API DEBUG: Using grounding pipeline`, {
         requestId,
@@ -216,10 +228,14 @@ export async function POST(req: NextRequest) {
       console.log(`🔍 API DEBUG: Using direct Gemini API`, {
         requestId,
         modelId,
-        useGroundingPipeline,
+        useGroundingPipeline: !!useGroundingPipeline,
         groundingEnabled: grounding?.enabled,
-        directGroundingSupported: !!grounding?.enabled
+        directGroundingSupported: !!grounding?.enabled && !useGroundingPipeline,
+        reason: !useGroundingPipeline ? "Model doesn't use grounding pipeline" : "Grounding not enabled"
       });
+
+      // Use direct API - only pass grounding if model supports it directly (not via pipeline)
+      const modelSupportsDirectGrounding = !useGroundingPipeline && grounding?.enabled;
 
       result = await generateContent(
         apiKey,
@@ -228,7 +244,7 @@ export async function POST(req: NextRequest) {
         modelId,
         attachments,
         ttsOptions,
-        grounding,
+        modelSupportsDirectGrounding ? grounding : undefined, // Only pass grounding for direct support
         enableThinking
       );
 

@@ -249,14 +249,43 @@ export async function generateContent(
 
   // Process attachments
   if (attachments && attachments.length > 0) {
+    serverLogger.info("Gemini: Processing attachments", { 
+      requestId,
+      count: attachments.length,
+      types: attachments.map(att => att.type)
+    });
+    
     for (const att of attachments) {
       let cleanData = att.data;
       if (att.data.includes(',')) {
         cleanData = att.data.split(',')[1];
       }
+      
+      // Handle different document types
+      if (att.type === 'application/pdf' || 
+          att.type.startsWith('text/') || 
+          att.type.includes('javascript') || 
+          att.type.includes('python') ||
+          att.type.startsWith('image/')) {
+        
+        serverLogger.debug("Gemini: Adding document/media attachment", { 
+          requestId,
+          fileName: att.name,
+          mimeType: att.type,
+          isDocument: !att.type.startsWith('image/'),
+          dataLength: cleanData.length
+        });
+        
       contents.push({
         inlineData: { mimeType: att.type, data: cleanData },
       });
+      } else {
+        serverLogger.warn("Gemini: Unsupported attachment type", { 
+          requestId,
+          fileName: att.name,
+          mimeType: att.type
+        });
+      }
     }
   }
 
@@ -555,8 +584,10 @@ export async function* generateContentStreamWithGrounding(
   const startTime = Date.now();
 
   try {
-    // STEP 1: Emit web search loading state
-    yield { type: 'grounding', content: 'Searching the web...', groundingMetadata: undefined };
+    // STEP 1: Emit web search loading state - only if grounding is enabled
+    if (grounding?.enabled) {
+      yield { type: 'grounding', content: 'Searching the web...', groundingMetadata: undefined };
+    }
     
     // Get grounding information from Gemini 2.0 Flash (non-streaming)
     console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Step 1 - Getting grounding from Gemini 2.0 Flash', {
@@ -604,7 +635,10 @@ export async function* generateContentStreamWithGrounding(
       }
     }
 
-    // STEP 2: Create enhanced prompt with grounding context
+    // STEP 2: Emit thinking phase loading state
+    yield { type: 'grounding', content: 'Analyzing with deep thinking...', groundingMetadata: undefined };
+
+    // Create enhanced prompt with grounding context
     let enhancedPrompt = prompt;
     if (groundingText && groundingMetadata?.citations && groundingMetadata.citations.length > 0) {
       const citationsText = groundingMetadata.citations
@@ -757,15 +791,43 @@ export async function* generateContentStream(
 
   // Process attachments
   if (attachments && attachments.length > 0) {
-    serverLogger.info("🔄 Streaming: Processing attachments", { requestId, count: attachments.length });
+    serverLogger.info("🔄 Streaming: Processing attachments", { 
+      requestId, 
+      count: attachments.length,
+      types: attachments.map(att => att.type)
+    });
+    
     for (const att of attachments) {
       let cleanData = att.data;
       if (att.data.includes(',')) {
         cleanData = att.data.split(',')[1];
       }
+      
+      // Handle different document types
+      if (att.type === 'application/pdf' || 
+          att.type.startsWith('text/') || 
+          att.type.includes('javascript') || 
+          att.type.includes('python') ||
+          att.type.startsWith('image/')) {
+        
+        serverLogger.debug("🔄 Streaming: Adding document/media attachment", { 
+          requestId,
+          fileName: att.name,
+          mimeType: att.type,
+          isDocument: !att.type.startsWith('image/'),
+          dataLength: cleanData.length
+        });
+        
       contents.push({
         inlineData: { mimeType: att.type, data: cleanData },
       });
+      } else {
+        serverLogger.warn("🔄 Streaming: Unsupported attachment type", { 
+          requestId,
+          fileName: att.name,
+          mimeType: att.type
+        });
+      }
     }
   }
 

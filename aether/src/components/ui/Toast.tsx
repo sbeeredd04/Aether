@@ -65,7 +65,7 @@ export function Toast({ id, type, title, message, duration = 5000, onClose, onAc
       case 'info':
         return <FiInfo className="text-blue-400" size={20} />;
       case 'consent':
-        return <FiDatabase className="text-purple-400" size={20} />;
+        return <FiShield className="text-purple-400" size={20} />;
       default:
         return <FiInfo className="text-blue-400" size={20} />;
     }
@@ -91,17 +91,17 @@ export function Toast({ id, type, title, message, duration = 5000, onClose, onAc
   const getBackgroundColor = () => {
     switch (type) {
       case 'success':
-        return 'bg-green-900/20';
+        return 'bg-green-900/30';
       case 'error':
-        return 'bg-red-900/20';
+        return 'bg-red-900/30';
       case 'warning':
-        return 'bg-yellow-900/20';
+        return 'bg-yellow-900/30';
       case 'info':
-        return 'bg-blue-900/20';
+        return 'bg-blue-900/30';
       case 'consent':
-        return 'bg-purple-900/20';
+        return 'bg-purple-900/30';
       default:
-        return 'bg-blue-900/20';
+        return 'bg-blue-900/30';
     }
   };
 
@@ -110,7 +110,7 @@ export function Toast({ id, type, title, message, duration = 5000, onClose, onAc
       className={`
         ${isVisible && !isExiting ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
         transform transition-all duration-300 ease-out
-        mb-4 max-w-md w-full
+        mb-3 max-w-md w-full
         ${getBackgroundColor()} backdrop-blur-md border ${getBorderColor()}
         rounded-xl shadow-xl p-4
       `}
@@ -134,29 +134,33 @@ export function Toast({ id, type, title, message, duration = 5000, onClose, onAc
             {type !== 'consent' && (
               <button
                 onClick={handleClose}
-                className="flex-shrink-0 ml-2 text-white/60 hover:text-white transition-colors"
+                className="flex-shrink-0 ml-2 text-white/60 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
               >
                 <FiX size={16} />
               </button>
             )}
           </div>
           
-          {type === 'consent' && (
+          {type === 'consent' && (onAccept || onDecline) && (
             <div className="flex items-center gap-2 mt-4">
-              <button
-                onClick={handleAccept}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <FiCheck size={16} />
-                Accept
-              </button>
-              <button
-                onClick={handleDecline}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <FiX size={16} />
-                Decline
-              </button>
+              {onAccept && (
+                <button
+                  onClick={handleAccept}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <FiCheck size={16} />
+                  Accept
+                </button>
+              )}
+              {onDecline && (
+                <button
+                  onClick={handleDecline}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <FiX size={16} />
+                  Decline
+                </button>
+              )}
               <div className="flex items-center gap-1 text-xs text-white/60 ml-2">
                 <FiShield size={12} />
                 Privacy Protected
@@ -173,7 +177,7 @@ export function ToastContainer({ toasts, onRemoveToast }: ToastManagerProps) {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="fixed top-4 right-4 z-[100] space-y-2 max-w-md">
       {toasts.map((toast) => (
         <Toast
           key={toast.id}
@@ -184,6 +188,13 @@ export function ToastContainer({ toasts, onRemoveToast }: ToastManagerProps) {
     </div>
   );
 }
+
+// Global toast manager instance
+let globalToastManager: {
+  addToast: (toast: Omit<ToastProps, 'id'>) => string;
+  removeToast: (id: string) => void;
+  clearAllToasts: () => void;
+} | null = null;
 
 // Hook for managing toasts
 export function useToast() {
@@ -231,6 +242,19 @@ export function useToast() {
     });
   };
 
+  // Set global reference
+  useEffect(() => {
+    globalToastManager = {
+      addToast,
+      removeToast,
+      clearAllToasts
+    };
+
+    return () => {
+      globalToastManager = null;
+    };
+  }, []);
+
   return {
     toasts,
     addToast,
@@ -242,4 +266,36 @@ export function useToast() {
     showInfo,
     showConsent
   };
-} 
+}
+
+// Global toast functions for use outside of React components
+export const globalToast = {
+  success: (title: string, message: string, duration?: number) => {
+    if (globalToastManager) {
+      return globalToastManager.addToast({ type: 'success', title, message, duration });
+    }
+    console.log(`SUCCESS: ${title} - ${message}`);
+    return '';
+  },
+  error: (title: string, message: string, duration?: number) => {
+    if (globalToastManager) {
+      return globalToastManager.addToast({ type: 'error', title, message, duration });
+    }
+    console.error(`ERROR: ${title} - ${message}`);
+    return '';
+  },
+  warning: (title: string, message: string, duration?: number) => {
+    if (globalToastManager) {
+      return globalToastManager.addToast({ type: 'warning', title, message, duration });
+    }
+    console.warn(`WARNING: ${title} - ${message}`);
+    return '';
+  },
+  info: (title: string, message: string, duration?: number) => {
+    if (globalToastManager) {
+      return globalToastManager.addToast({ type: 'info', title, message, duration });
+    }
+    console.info(`INFO: ${title} - ${message}`);
+    return '';
+  }
+}; 

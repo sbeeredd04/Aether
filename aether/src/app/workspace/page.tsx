@@ -5,9 +5,7 @@ import ChatCanvas from '@/components/ChatCanvas';
 import NodeSidebar from '@/components/NodeSidebar';
 import PromptBar from '@/components/PromptBar';
 import { useChatStore } from '@/store/chatStore';
-import { FiSettings, FiHome, FiMenu, FiX } from 'react-icons/fi';
-import { FaInfo, FaGithub, FaExternalLinkAlt } from 'react-icons/fa';
-import { BsLayoutSidebarInsetReverse } from "react-icons/bs";
+import { FaGithub, FaExternalLinkAlt } from 'react-icons/fa';
 import { BiMessageSquareDetail, BiNetworkChart } from "react-icons/bi";
 import Link from 'next/link';
 import Image from 'next/image';
@@ -15,7 +13,9 @@ import SettingsPanel from '@/components/SettingsPanel';
 import VoiceInputModal from '@/components/VoiceInputModal';
 import ImageModal from '@/components/ImageModal';
 import ModelInfoModal from '@/components/ModelInfoModal';
+import WorkspaceSelector from '@/components/WorkspaceSelector';
 import { ToastContainer, useToast } from '@/components/ui/Toast';
+import { WorkspaceMetadata } from '@/utils/workspaceManager';
 
 // Streaming state interface for NodeSidebar
 interface StreamingState {
@@ -66,7 +66,6 @@ export default function WorkspacePage() {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showModelInfo, setShowModelInfo] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'canvas' | 'chat'>('canvas');
   
   // Streaming state management
@@ -98,6 +97,15 @@ export default function WorkspacePage() {
   const needsStorageConsent = useChatStore(s => s.needsStorageConsent);
   const setStorageConsent = useChatStore(s => s.setStorageConsent);
   const getStorageStats = useChatStore(s => s.getStorageStats);
+  
+  // Workspace management
+  const getCurrentWorkspace = useChatStore(s => s.getCurrentWorkspace);
+  const switchWorkspace = useChatStore(s => s.switchWorkspace);
+  const createNewWorkspace = useChatStore(s => s.createNewWorkspace);
+  const renameCurrentWorkspace = useChatStore(s => s.renameCurrentWorkspace);
+  const deleteWorkspace = useChatStore(s => s.deleteWorkspace);
+  
+  const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceMetadata | null>(null);
   
   const activeNode = nodes.find(n => n.id === activeNodeId);
   const isRootNode = activeNodeId === 'root';
@@ -131,6 +139,14 @@ export default function WorkspacePage() {
 
   // Initialize toast system
   const { toasts, removeToast, showConsent, showSuccess, showError } = useToast();
+
+  // Load current workspace on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const workspace = getCurrentWorkspace();
+      setCurrentWorkspace(workspace);
+    }
+  }, [getCurrentWorkspace]);
   
   // Load workspace on mount
   useEffect(() => {
@@ -147,11 +163,12 @@ export default function WorkspacePage() {
         const workspaceLoaded = loadFromStorage();
         if (workspaceLoaded && mounted) {
           console.log('Workspace restored successfully');
-          const stats = getStorageStats();
-          if (stats && mounted) {
+          const workspace = getCurrentWorkspace();
+          setCurrentWorkspace(workspace);
+          if (workspace && mounted) {
             showSuccess(
               'Workspace Restored',
-              `Loaded ${stats.totalMessages} messages across ${stats.totalNodes} conversations.`,
+              `Loaded "${workspace.name}" with ${workspace.totalMessages} messages across ${workspace.totalNodes} conversations.`,
               3000
             );
           }
@@ -316,6 +333,52 @@ export default function WorkspacePage() {
     setSelectedImage(null);
   };
 
+  // Workspace handlers
+  const handleWorkspaceChange = (workspaceId: string) => {
+    const success = switchWorkspace(workspaceId);
+    if (success) {
+      const newWorkspace = getCurrentWorkspace();
+      setCurrentWorkspace(newWorkspace);
+      showSuccess(
+        'Workspace Switched',
+        `Switched to "${newWorkspace?.name || 'Unknown'}" workspace`,
+        2000
+      );
+    } else {
+      showError(
+        'Switch Failed',
+        'Failed to switch workspace. Please try again.',
+        3000
+      );
+    }
+  };
+
+  const handleWorkspaceRename = (workspaceId: string, newName: string) => {
+    const success = renameCurrentWorkspace(newName);
+    if (success) {
+      const updatedWorkspace = getCurrentWorkspace();
+      setCurrentWorkspace(updatedWorkspace);
+      // Don't show toast here - WorkspaceSelector handles it
+    } else {
+      showError(
+        'Rename Failed',
+        'Failed to rename workspace. Please try again.',
+        3000
+      );
+    }
+  };
+
+  // Handle toasts from WorkspaceSelector
+  const handleWorkspaceToast = (type: 'success' | 'error' | 'consent', title: string, message: string, onAccept?: () => void, onDecline?: () => void) => {
+    if (type === 'consent' && onAccept && onDecline) {
+      showConsent(title, message, onAccept, onDecline);
+    } else if (type === 'success') {
+      showSuccess(title, message, 2000);
+    } else if (type === 'error') {
+      showError(title, message, 3000);
+    }
+  };
+
   // Streaming event handlers for PromptBar
   const handleStreamingStart = (config: { groundingEnabled: boolean; useGroundingPipeline: boolean; modelSupportsThinking: boolean; }) => {
     console.log('🔄 Workspace: Streaming started', config);
@@ -396,41 +459,26 @@ export default function WorkspacePage() {
     });
   };
 
-  // Mobile menu items
-  const mobileMenuItems = [
-    { icon: <FiHome size={20} />, label: 'Home', href: '/' },
-    { icon: <FaInfo size={20} />, label: 'Model Info', action: () => setShowModelInfo(true) },
-    { icon: <FiSettings size={20} />, label: 'Settings', action: () => setSettingsOpen(true) },
-    { icon: <FaGithub size={20} />, label: 'GitHub', href: 'https://github.com/sbeeredd04/Aether', external: true },
-  ];
+
 
   return (
     <main className="bg-[#000000] h-screen flex flex-col relative overflow-hidden">
       {/* Desktop Layout */}
       {!isMobile && (
         <>
-          {/* Desktop Top Control Bar */}
-          <div className="absolute top-4 left-4 flex gap-3 z-50 items-center">
-            <div className="flex items-center gap-3 bg-black/30 backdrop-blur-sm px-3 py-2 rounded-md">
-              <Image src="/aether.svg" alt="Aether AI" width={40} height={40} />
-              <span className="text-white font-major-mono text-3xl font-normal">Aether</span>
-            </div>
-            
-            <Link href="/" className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md">
-              <FiHome size={22} />
-            </Link>
-            {!isSidebarOpen && (
-              <button onClick={() => setIsSidebarOpen(true)} className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md">
-                <BsLayoutSidebarInsetReverse size={22} />
-              </button>
-            )}
-            <button onClick={() => setShowModelInfo(true)} className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md">
-              <FaInfo size={22} />
-            </button>
-            <button onClick={() => setSettingsOpen(true)} className="text-white/80 hover:text-white transition-colors bg-black/30 backdrop-blur-sm p-2 rounded-md">
-              <FiSettings size={22} />
-            </button>
-          </div>
+          {/* Desktop Navigation Bar */}
+          <WorkspaceSelector
+            currentWorkspace={currentWorkspace}
+            onWorkspaceChange={handleWorkspaceChange}
+            onWorkspaceRename={handleWorkspaceRename}
+            isMobile={false}
+            isSidebarOpen={isSidebarOpen}
+            sidebarWidth={sidebarWidth}
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            onShowSettings={() => setSettingsOpen(true)}
+            onShowModelInfo={() => setShowModelInfo(true)}
+            onShowToast={handleWorkspaceToast}
+          />
 
           {/* Desktop Main Content */}
           <div className="flex flex-1 h-full">
@@ -512,66 +560,18 @@ export default function WorkspacePage() {
       {/* Mobile Layout */}
       {isMobile && (
         <div className="flex flex-col h-full">
-          {/* Mobile Header */}
-          <div className="flex items-center justify-between p-4 bg-black/40 backdrop-blur-sm border-b border-white/10 z-50">
-            <div className="flex items-center gap-2">
-              <Image src="/aether.svg" alt="Aether AI" width={24} height={24} />
-              <span className="text-white font-major-mono text-lg font-normal">Aether</span>
-            </div>
-            
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-white/80 hover:text-white transition-colors p-2"
-            >
-              {isMobileMenuOpen ? <FiX size={20} /> : <FiMenu size={20} />}
-            </button>
+          {/* Mobile Navigation Bar */}
+          <div className="relative">
+            <WorkspaceSelector
+              currentWorkspace={currentWorkspace}
+              onWorkspaceChange={handleWorkspaceChange}
+              onWorkspaceRename={handleWorkspaceRename}
+              isMobile={true}
+              onShowSettings={() => setSettingsOpen(true)}
+              onShowModelInfo={() => setShowModelInfo(true)}
+              onShowToast={handleWorkspaceToast}
+            />
           </div>
-
-          {/* Mobile Menu Overlay */}
-          {isMobileMenuOpen && (
-            <div className="absolute top-16 left-0 right-0 bg-black/90 backdrop-blur-md border-b border-white/10 z-40">
-              <div className="p-4 space-y-3">
-                {mobileMenuItems.map((item, index) => (
-                  <div key={index}>
-                    {item.href ? (
-                      item.external ? (
-                        <a
-                          href={item.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 text-white/80 hover:text-white transition-colors py-2"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          {item.icon}
-                          <span className="text-sm">{item.label}</span>
-                        </a>
-                      ) : (
-                        <Link
-                          href={item.href}
-                          className="flex items-center gap-3 text-white/80 hover:text-white transition-colors py-2"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          {item.icon}
-                          <span className="text-sm">{item.label}</span>
-                        </Link>
-                      )
-                    ) : (
-                      <button
-                        onClick={() => {
-                          item.action?.();
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="flex items-center gap-3 text-white/80 hover:text-white transition-colors py-2 w-full text-left"
-                      >
-                        {item.icon}
-                        <span className="text-sm">{item.label}</span>
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Mobile Tab Switcher */}
           <div className="flex bg-black/40 backdrop-blur-sm border-b border-white/10">
@@ -600,7 +600,7 @@ export default function WorkspacePage() {
           </div>
 
           {/* Mobile Content Area */}
-          <div className="flex-1 relative overflow-hidden">
+          <div className="flex-1 relative overflow-hidden" style={{ marginTop: '80px' }}>
             {/* Canvas View */}
             <div className={`absolute inset-0 transition-transform duration-300 ${
               activeTab === 'canvas' ? 'translate-x-0' : '-translate-x-full'

@@ -14,6 +14,7 @@ import { ChatManager } from '../utils/chatManager';
 import logger from '../utils/logger';
 import { persistentStorage, STORAGE_VERSION } from '../utils/persistentStorage';
 import { debouncedSave, isSaving } from '../utils/saveDebouncer';
+import { workspaceManager, WorkspaceMetadata } from '../utils/workspaceManager';
 
 export interface AttachmentData {
   name: string;
@@ -82,6 +83,12 @@ interface ChatState {
   hasStorageConsent: () => boolean;
   needsStorageConsent: () => boolean;
   setStorageConsent: (granted: boolean) => void;
+  // Workspace management methods
+  getCurrentWorkspace: () => WorkspaceMetadata | null;
+  switchWorkspace: (workspaceId: string) => boolean;
+  createNewWorkspace: (name: string) => string;
+  renameCurrentWorkspace: (newName: string) => boolean;
+  deleteWorkspace: (workspaceId: string) => boolean;
 }
 
 const ROOT_NODE: Node<CustomNodeData> = {
@@ -94,6 +101,7 @@ const ROOT_NODE: Node<CustomNodeData> = {
 // Legacy keys for backward compatibility
 const SESSION_STORAGE_KEY = 'aether-chat-session';
 const LEGACY_SESSION_VERSION = '1.0.0';
+const SESSION_VERSION = '1.0.0';
 
 // Utility functions for session management
 const saveSessionData = (data: SessionData): boolean => {
@@ -216,20 +224,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Use the debouncer utility to prevent infinite loops
     debouncedSave('workspace', () => {
       const state = get();
+      const currentWorkspaceId = workspaceManager.getActiveWorkspaceId();
+      const currentWorkspace = workspaceManager.getActiveWorkspace();
+      
       const workspaceData = {
+        name: currentWorkspace?.name || 'Current Workspace',
         nodes: state.nodes,
         edges: state.edges,
         activeNodeId: state.activeNodeId,
         timestamp: Date.now(),
-        version: STORAGE_VERSION
+        version: STORAGE_VERSION,
+        metadata: {
+          totalMessages: state.nodes.reduce((sum, node) => 
+            sum + (node.data?.chatHistory?.length || 0), 0
+          ),
+          totalAttachments: state.nodes.reduce((sum, node) => 
+            sum + (node.data?.chatHistory?.reduce((msgSum: number, msg: any) => 
+              msgSum + (msg.attachments?.length || 0), 0) || 0), 0
+          ),
+          createdAt: currentWorkspace?.createdAt || Date.now(),
+          lastModified: Date.now(),
+          dataSize: 0
+        }
       };
       
-      const success = persistentStorage.saveWorkspaceData(workspaceData);
+      const success = workspaceManager.saveWorkspaceData(currentWorkspaceId, workspaceData);
       
       if (success) {
-        logger.debug('ChatStore: Workspace saved successfully using persistent storage');
+        logger.debug('ChatStore: Workspace saved successfully using workspace manager');
       } else {
-        logger.warn('ChatStore: Failed to save workspace using persistent storage');
+        logger.warn('ChatStore: Failed to save workspace using workspace manager');
       }
       
       return success;
@@ -242,9 +266,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadFromStorage: () => {
     try {
-      const workspaceData = persistentStorage.loadWorkspaceData();
+      const currentWorkspaceId = workspaceManager.getActiveWorkspaceId();
+      const workspaceData = workspaceManager.getWorkspaceData(currentWorkspaceId);
       if (!workspaceData) {
-        logger.debug('ChatStore: No workspace data found in persistent storage');
+        logger.debug('ChatStore: No workspace data found for current workspace');
         return false;
       }
 
@@ -1189,7 +1214,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().saveToStorage();
   },
 
-  activeNodeId: null,
   setActiveNodeId: (nodeId) => {
     logger.info('ChatStore: Setting active node', { 
       previousActiveNodeId: get().activeNodeId,
@@ -1227,5 +1251,128 @@ export const useChatStore = create<ChatState>((set, get) => ({
     
     // Save to storage when active node changes
     get().saveToStorage();
+  },
+
+  // Workspace management methods
+  getCurrentWorkspace: () => {
+    return workspaceManager.getActiveWorkspace();
+  },
+
+  switchWorkspace: (workspaceId: string) => {
+    try {
+      // Save current workspace before switching
+      const currentState = get();
+      const currentWorkspaceId = workspaceManager.getActiveWorkspaceId();
+      
+      if (currentWorkspaceId !== workspaceId) {
+        // Save current workspace data
+        const workspaceData = {
+          name: workspaceManager.getActiveWorkspace()?.name || 'Current Workspace',
+          nodes: currentState.nodes,
+          edges: currentState.edges,
+          activeNodeId: currentState.activeNodeId,
+          timestamp: Date.now(),
+          version: STORAGE_VERSION,
+          metadata: {
+            totalMessages: currentState.nodes.reduce((sum, node) => 
+              sum + (node.data?.chatHistory?.length || 0), 0
+            ),
+            totalAttachments: currentState.nodes.reduce((sum, node) => 
+              sum + (node.data?.chatHistory?.reduce((msgSum: number, msg: any) => 
+                msgSum + (msg.attachments?.length || 0), 0) || 0), 0
+            ),
+            createdAt: Date.now(),
+            lastModified: Date.now(),
+            dataSize: 0
+          }
+        };
+        
+        workspaceManager.saveWorkspaceData(currentWorkspaceId, workspaceData);
+        
+        // Switch to new workspace
+        workspaceManager.setActiveWorkspace(workspaceId);
+        
+        // Load new workspace data
+        const newWorkspaceData = workspaceManager.getWorkspaceData(workspaceId);
+        if (newWorkspaceData) {
+          // Ensure root node exists
+          const hasRoot = newWorkspaceData.nodes.some(node => node.id === 'root');
+          if (!hasRoot) {
+            newWorkspaceData.nodes.unshift(ROOT_NODE);
+          }
+
+          set({
+            nodes: newWorkspaceData.nodes,
+            edges: newWorkspaceData.edges,
+            activeNodeId: newWorkspaceData.activeNodeId || 'root',
+            activePath: {
+              nodeIds: newWorkspaceData.activeNodeId ? 
+                get().getPathNodeIds(newWorkspaceData.activeNodeId) : ['root'],
+              edgeIds: newWorkspaceData.activeNodeId ? 
+                get().getPathEdgeIds(newWorkspaceData.activeNodeId) : []
+            }
+          });
+        } else {
+          // Initialize with default state if no data
+          set({
+            nodes: [ROOT_NODE],
+            edges: [],
+            activeNodeId: 'root',
+            activePath: { nodeIds: ['root'], edgeIds: [] }
+          });
+        }
+        
+        logger.info('ChatStore: Switched to workspace', { workspaceId });
+        return true;
+      }
+      
+      return true;
+    } catch (error) {
+      logger.error('ChatStore: Failed to switch workspace', { workspaceId, error });
+      return false;
+    }
+  },
+
+  createNewWorkspace: (name: string) => {
+    try {
+      const workspaceId = workspaceManager.createWorkspace(name);
+      logger.info('ChatStore: Created new workspace', { workspaceId, name });
+      return workspaceId;
+    } catch (error) {
+      logger.error('ChatStore: Failed to create workspace', { name, error });
+      return '';
+    }
+  },
+
+  renameCurrentWorkspace: (newName: string) => {
+    try {
+      const currentWorkspace = workspaceManager.getActiveWorkspace();
+      if (!currentWorkspace) return false;
+      
+      const success = workspaceManager.renameWorkspace(currentWorkspace.id, newName);
+      if (success) {
+        logger.info('ChatStore: Renamed current workspace', { 
+          workspaceId: currentWorkspace.id, 
+          newName 
+        });
+      }
+      return success;
+    } catch (error) {
+      logger.error('ChatStore: Failed to rename workspace', { newName, error });
+      return false;
+    }
+  },
+
+  deleteWorkspace: (workspaceId: string) => {
+    try {
+      const success = workspaceManager.deleteWorkspace(workspaceId);
+      if (success) {
+        logger.info('ChatStore: Deleted workspace', { workspaceId });
+      }
+      return success;
+    } catch (error) {
+      logger.error('ChatStore: Failed to delete workspace', { workspaceId, error });
+      return false;
+    }
   },
 })); 

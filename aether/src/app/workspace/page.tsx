@@ -14,6 +14,7 @@ import VoiceInputModal from '@/components/VoiceInputModal';
 import ImageModal from '@/components/ImageModal';
 import ModelInfoModal from '@/components/ModelInfoModal';
 import WorkspaceSelector from '@/components/WorkspaceSelector';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { ToastContainer, useToast } from '@/components/ui/Toast';
 import { WorkspaceMetadata } from '@/utils/workspaceManager';
 
@@ -67,6 +68,7 @@ export default function WorkspacePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showModelInfo, setShowModelInfo] = useState(false);
   const [activeTab, setActiveTab] = useState<'canvas' | 'chat'>('canvas');
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   
   // Streaming state management
   const [streamingState, setStreamingState] = useState<StreamingState>({
@@ -173,10 +175,17 @@ export default function WorkspacePage() {
             );
           }
         }
+        // End initial loading after workspace is loaded
+        if (mounted) {
+          setIsInitialLoading(false);
+        }
       } catch (error) {
         console.error('Error loading workspace:', error);
+        if (mounted) {
+          setIsInitialLoading(false);
+        }
       }
-    }, 150);
+    }, 100); // Reduced from 150ms to 100ms for faster loading
 
     return () => {
       mounted = false;
@@ -207,7 +216,7 @@ export default function WorkspacePage() {
                   'Your workspace will now be saved automatically. You can disable this anytime in settings.',
                   4000
                 );
-              }
+    }
             },
             () => {
               if (mounted) {
@@ -461,6 +470,21 @@ export default function WorkspacePage() {
 
 
 
+  // Show loading screen during initial load
+  if (isInitialLoading) {
+    return (
+      <main className="bg-[#000000] h-screen flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20"></div>
+        <LoadingSpinner 
+          size={120} 
+          showText={true} 
+          text="Loading Workspace..." 
+          className="relative z-10"
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="bg-[#000000] h-screen flex flex-col relative overflow-hidden">
       {/* Desktop Layout */}
@@ -488,7 +512,12 @@ export default function WorkspacePage() {
             
             {isSidebarOpen && (
               <div className="relative h-full flex">
-                <div className="w-[10px] h-full cursor-ew-resize hover:bg-purple-500/50 z-50 bg-white/10" onMouseDown={startResize} />
+                <div 
+                  className="w-[6px] h-full cursor-ew-resize group z-50 bg-white/5 hover:bg-white/10 transition-colors flex items-center justify-center" 
+                  onMouseDown={startResize}
+                >
+                  <div className="w-[2px] h-8 bg-white/40 group-hover:bg-purple-400 transition-colors rounded-full"></div>
+                </div>
                 <div className="bg-black/30 backdrop-blur-sm border-l border-white/10 shadow-xl z-40 h-full" style={{ width: `${sidebarWidth}px` }}>
                   <NodeSidebar
                     isOpen={true}
@@ -513,7 +542,7 @@ export default function WorkspacePage() {
           <div
             className="absolute left-0 bottom-0 w-full flex justify-center items-end pointer-events-none mb-6"
             style={{
-              paddingRight: isSidebarOpen ? sidebarWidth + 10 : 0,
+              paddingRight: isSidebarOpen ? sidebarWidth + 4 : 0,
               transition: 'padding-right 0.2s',
               zIndex: 60,
             }}

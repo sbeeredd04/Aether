@@ -19,10 +19,10 @@ export interface ChatRequestOptions {
 export async function makeChatRequest(options: ChatRequestOptions) {
   const settings = getSettings();
   
-  // Use user's streaming preference unless explicitly overridden
+  // Always use streaming unless explicitly disabled
   const useStreaming = options.forceStreaming !== undefined 
     ? options.forceStreaming 
-    : settings.streamingEnabled;
+    : true;
     
   console.log('🔌 API Client: Making request', {
     modelId: options.modelId,
@@ -169,7 +169,7 @@ export async function sendChatMessage(
   const settings = getSettings();
   const useStreaming = options.forceStreaming !== undefined 
     ? options.forceStreaming 
-    : settings.streamingEnabled;
+    : true;
 
   const response = await makeChatRequest(options);
 

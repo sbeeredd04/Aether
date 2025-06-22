@@ -8,6 +8,7 @@ export interface WorkspaceMetadata {
   totalMessages: number;
   totalNodes: number;
   isActive: boolean;
+  icon?: string; // Optional icon name
 }
 
 export interface WorkspaceData {
@@ -53,25 +54,45 @@ class WorkspaceManager {
     return `workspace_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Get all workspaces metadata
+  // Get all workspaces metadata with caching
+  private _cachedWorkspaces: WorkspaceMetadata[] | null = null;
+  private _cacheTimestamp: number = 0;
+  private readonly CACHE_DURATION = 5000; // 5 seconds cache
+
   getWorkspaces(): WorkspaceMetadata[] {
     if (!this.isBrowser()) return [];
+
+    // Return cached data if still valid
+    const now = Date.now();
+    if (this._cachedWorkspaces && (now - this._cacheTimestamp) < this.CACHE_DURATION) {
+      return this._cachedWorkspaces;
+    }
 
     try {
       const stored = localStorage.getItem(WORKSPACE_KEYS.WORKSPACES_LIST);
       if (!stored) {
         // Create default workspace if none exist
         const defaultWorkspace = this.createDefaultWorkspace();
+        this._cachedWorkspaces = [defaultWorkspace];
+        this._cacheTimestamp = now;
         return [defaultWorkspace];
       }
 
       const workspaces: WorkspaceMetadata[] = JSON.parse(stored);
+      this._cachedWorkspaces = workspaces;
+      this._cacheTimestamp = now;
       logger.debug('WorkspaceManager: Retrieved workspaces', { count: workspaces.length });
       return workspaces;
     } catch (error) {
       logger.error('WorkspaceManager: Failed to get workspaces', { error });
       return [];
     }
+  }
+
+  // Clear cache when workspaces are modified
+  private clearCache(): void {
+    this._cachedWorkspaces = null;
+    this._cacheTimestamp = 0;
   }
 
   // Create default workspace
@@ -99,6 +120,8 @@ class WorkspaceManager {
 
     try {
       localStorage.setItem(WORKSPACE_KEYS.WORKSPACES_LIST, JSON.stringify(workspaces));
+      // Clear cache when data is updated
+      this.clearCache();
       logger.debug('WorkspaceManager: Saved workspaces list', { count: workspaces.length });
     } catch (error) {
       logger.error('WorkspaceManager: Failed to save workspaces list', { error });
@@ -246,6 +269,32 @@ class WorkspaceManager {
     }
   }
 
+  // Update workspace icon
+  updateWorkspaceIcon(workspaceId: string, iconName: string): boolean {
+    if (!this.isBrowser()) return false;
+
+    try {
+      const workspaces = this.getWorkspaces();
+      const workspaceIndex = workspaces.findIndex(ws => ws.id === workspaceId);
+      
+      if (workspaceIndex === -1) {
+        logger.warn('WorkspaceManager: Workspace not found for icon update', { workspaceId });
+        return false;
+      }
+
+      workspaces[workspaceIndex].icon = iconName;
+      workspaces[workspaceIndex].lastModified = Date.now();
+      
+      this.saveWorkspacesList(workspaces);
+      
+      logger.info('WorkspaceManager: Updated workspace icon', { workspaceId, iconName });
+      return true;
+    } catch (error) {
+      logger.error('WorkspaceManager: Failed to update workspace icon', { workspaceId, error });
+      return false;
+    }
+  }
+
   // Delete workspace
   deleteWorkspace(workspaceId: string): boolean {
     if (!this.isBrowser() || workspaceId === 'default') return false;
@@ -360,6 +409,74 @@ class WorkspaceManager {
     } catch (error) {
       logger.error('WorkspaceManager: Failed to import workspace', { error });
       return null;
+    }
+  }
+
+  // Import multiple workspaces
+  importAllWorkspaces(importData: string): number {
+    try {
+      const parsed = JSON.parse(importData);
+      
+      if (!parsed.workspaces || !Array.isArray(parsed.workspaces)) {
+        throw new Error('Invalid multi-workspace export format');
+      }
+
+      let importedCount = 0;
+      const existingWorkspaces = this.getWorkspaces();
+
+      parsed.workspaces.forEach((wsData: any) => {
+        if (wsData.metadata && wsData.data) {
+          try {
+            const newWorkspaceId = this.generateWorkspaceId();
+            const workspaceName = `${wsData.metadata.name} (Imported)`;
+
+            // Create workspace metadata
+            const newWorkspace: WorkspaceMetadata = {
+              id: newWorkspaceId,
+              name: workspaceName,
+              createdAt: Date.now(),
+              lastModified: Date.now(),
+              totalMessages: wsData.data.metadata?.totalMessages || 0,
+              totalNodes: wsData.data.nodes?.length || 1,
+              isActive: false
+            };
+
+            existingWorkspaces.push(newWorkspace);
+
+            // Save workspace data
+            this.saveWorkspaceData(newWorkspaceId, {
+              name: workspaceName,
+              nodes: wsData.data.nodes || [],
+              edges: wsData.data.edges || [],
+              activeNodeId: wsData.data.activeNodeId || null,
+              timestamp: Date.now(),
+              version: wsData.data.version || '1.0',
+              metadata: {
+                totalMessages: wsData.data.metadata?.totalMessages || 0,
+                totalAttachments: wsData.data.metadata?.totalAttachments || 0,
+                createdAt: Date.now(),
+                lastModified: Date.now(),
+                dataSize: wsData.data.metadata?.dataSize || 0
+              }
+            });
+
+            importedCount++;
+          } catch (error) {
+            logger.error('WorkspaceManager: Failed to import individual workspace', { error, workspace: wsData.metadata?.name });
+          }
+        }
+      });
+
+      // Save updated workspaces list
+      if (importedCount > 0) {
+        this.saveWorkspacesList(existingWorkspaces);
+      }
+
+      logger.info('WorkspaceManager: Imported multiple workspaces', { importedCount });
+      return importedCount;
+    } catch (error) {
+      logger.error('WorkspaceManager: Failed to import multiple workspaces', { error });
+      return 0;
     }
   }
 

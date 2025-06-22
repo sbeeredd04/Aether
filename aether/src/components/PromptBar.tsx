@@ -6,7 +6,6 @@ import { LuBrain } from "react-icons/lu";
 import { TbBrandGoogle } from "react-icons/tb";
 import { useChatStore } from '../store/chatStore';
 import { models, getTTSVoices, getModelById } from '../utils/models';
-import { isStreamingEnabled } from '../utils/settings';
 import logger from '../utils/logger';
 
 interface PromptBarProps {
@@ -447,8 +446,8 @@ export default function PromptBar({
         throw new Error('API key is empty.');
       }
 
-      // Check streaming preference
-      const streamingEnabled = isStreamingEnabled();
+      // Always enable streaming by default
+      const streamingEnabled = true;
       logger.info('PromptBar: Streaming preference', { streamingEnabled });
 
       logger.info('PromptBar: Making API request', {

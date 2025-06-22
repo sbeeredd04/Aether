@@ -15,6 +15,7 @@ import SettingsPanel from '@/components/SettingsPanel';
 import VoiceInputModal from '@/components/VoiceInputModal';
 import ImageModal from '@/components/ImageModal';
 import ModelInfoModal from '@/components/ModelInfoModal';
+import { ToastContainer, useToast } from '@/components/ui/Toast';
 
 // Streaming state interface for NodeSidebar
 interface StreamingState {
@@ -93,7 +94,10 @@ export default function WorkspacePage() {
   const deleteNodeAndDescendants = useChatStore(s => s.deleteNodeAndDescendants);
   const createNodeAndEdge = useChatStore(s => s.createNodeAndEdge);
   const setActiveNodeId = useChatStore(s => s.setActiveNodeId);
-  const loadFromSession = useChatStore(s => s.loadFromSession);
+  const loadFromStorage = useChatStore(s => s.loadFromStorage);
+  const needsStorageConsent = useChatStore(s => s.needsStorageConsent);
+  const setStorageConsent = useChatStore(s => s.setStorageConsent);
+  const getStorageStats = useChatStore(s => s.getStorageStats);
   
   const activeNode = nodes.find(n => n.id === activeNodeId);
   const isRootNode = activeNodeId === 'root';
@@ -125,13 +129,91 @@ export default function WorkspacePage() {
     }
   }, [activeNodeId, isMobile]);
 
-  // Load session on mount
+  // Initialize toast system
+  const { toasts, removeToast, showConsent, showSuccess, showError } = useToast();
+  
+  // Load workspace on mount
   useEffect(() => {
-    const sessionLoaded = loadFromSession();
-    if (sessionLoaded) {
-      console.log('Session restored successfully');
-    }
-  }, [loadFromSession]);
+    // Only run in browser environment
+    if (typeof window === 'undefined') return;
+    
+    // Only run once on initial mount
+    let mounted = true;
+    
+    const loadTimer = setTimeout(() => {
+      if (!mounted) return;
+      
+      try {
+        const workspaceLoaded = loadFromStorage();
+        if (workspaceLoaded && mounted) {
+          console.log('Workspace restored successfully');
+          const stats = getStorageStats();
+          if (stats && mounted) {
+            showSuccess(
+              'Workspace Restored',
+              `Loaded ${stats.totalMessages} messages across ${stats.totalNodes} conversations.`,
+              3000
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error loading workspace:', error);
+      }
+    }, 150);
+
+    return () => {
+      mounted = false;
+      clearTimeout(loadTimer);
+    };
+  }, []); // Remove dependencies to ensure it only runs once
+
+  // Check for storage consent on mount
+  useEffect(() => {
+    // Only run in browser environment
+    if (typeof window === 'undefined') return;
+    
+    let mounted = true;
+    
+    const consentTimer = setTimeout(() => {
+      if (!mounted) return;
+      
+      try {
+        if (needsStorageConsent() && mounted) {
+          showConsent(
+            'Save Your Workspace Data',
+            'Would you like to save your conversations and workspace data locally in your browser? This allows your work to persist even after closing the tab. Your data remains private and never leaves your device.',
+            () => {
+              if (mounted) {
+                setStorageConsent(true);
+                showSuccess(
+                  'Data Saving Enabled',
+                  'Your workspace will now be saved automatically. You can disable this anytime in settings.',
+                  4000
+                );
+              }
+            },
+            () => {
+              if (mounted) {
+                setStorageConsent(false);
+                showError(
+                  'Session-Only Mode',
+                  'Your workspace will only be saved for this session. Closing the tab will lose your work.',
+                  5000
+                );
+              }
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Error checking storage consent:', error);
+      }
+    }, 500);
+
+    return () => {
+      mounted = false;
+      clearTimeout(consentTimer);
+    };
+  }, []); // Remove dependencies to ensure it only runs once
 
   // Handle resize events for desktop sidebar
   useEffect(() => {
@@ -587,6 +669,9 @@ export default function WorkspacePage() {
         <ImageModal isOpen={showImageModal} onClose={handleCloseImageModal} imageSrc={selectedImage.src} imageTitle={selectedImage.title} />
       )}
       <ModelInfoModal isOpen={showModelInfo} onClose={() => setShowModelInfo(false)} />
+      
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} onRemoveToast={removeToast} />
     </main>
   );
 } 

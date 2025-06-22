@@ -127,6 +127,28 @@ export default function WorkspaceSelector({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Handle horizontal scroll with mouse wheel
+  useEffect(() => {
+    const tabsContainer = tabsRef.current;
+    if (!tabsContainer) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Prevent default vertical scrolling
+      e.preventDefault();
+      
+      // Convert vertical scroll to horizontal scroll
+      const scrollAmount = e.deltaY || e.deltaX;
+      tabsContainer.scrollLeft += scrollAmount;
+    };
+
+    // Add wheel event listener with passive: false to allow preventDefault
+    tabsContainer.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      tabsContainer.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   const showToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string, duration?: number) => {
     if (onShowToast && (type === 'success' || type === 'error')) {
       onShowToast(type, title, message);
@@ -309,7 +331,7 @@ export default function WorkspaceSelector({
 
   const scrollTabs = (direction: 'left' | 'right') => {
     if (tabsRef.current) {
-      const scrollAmount = 200; // Increased scroll amount for larger tabs
+      const scrollAmount = 150; // Optimized scroll amount for new tab sizes
       const currentScroll = tabsRef.current.scrollLeft;
       const targetScroll = direction === 'left' 
         ? currentScroll - scrollAmount 
@@ -401,7 +423,7 @@ export default function WorkspaceSelector({
                 {/* Tabs Scroll Container */}
                 <div 
                   ref={tabsRef}
-                  className="flex items-stretch overflow-x-auto scrollbar-hide scroll-smooth flex-1 min-w-0 relative"
+                  className="flex items-stretch overflow-x-auto overflow-y-hidden scrollbar-hide scroll-smooth flex-1 min-w-0 relative gap-2"
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
                   {/* Workspace Tabs */}
@@ -414,7 +436,7 @@ export default function WorkspaceSelector({
                       <div
                         key={workspace.id}
                         className={`
-                          group relative flex items-center min-w-0 max-w-52 h-12 cursor-pointer mx-2
+                          group relative flex items-center min-w-[120px] max-w-[200px] h-12 cursor-pointer flex-shrink-0
                           transition-all duration-300 ease-out text-sm font-medium
                           ${isActive
                             ? 'bg-white/8 text-white shadow-lg z-10 transform scale-105 rounded-t-lg' 
@@ -424,7 +446,7 @@ export default function WorkspaceSelector({
                         onClick={() => handleWorkspaceSelect(workspace.id)}
                       >
                         {/* Tab Content */}
-                        <div className="flex items-center min-w-0 flex-1 h-full px-4 relative z-10">
+                        <div className="flex items-center min-w-0 flex-1 h-full px-3 relative z-10">
                           {editingId === workspace.id ? (
                             <input
                               ref={editInputRef}
@@ -440,37 +462,37 @@ export default function WorkspaceSelector({
                             <>
                               {/* Workspace Icon */}
                               <div 
-                                className="flex-shrink-0 w-5 h-5 mr-4 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                                className="flex-shrink-0 w-4 h-4 mr-2 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setIconPickerWorkspaceId(workspace.id);
                                 }}
                                 title="Click to change icon"
                               >
-                                <IconComponent size={16} className="text-white/80 hover:text-white transition-colors" />
+                                <IconComponent size={14} className="text-white/80 hover:text-white transition-colors" />
                               </div>
                               
-                              <span className="truncate flex-1 min-w-0 font-medium">
+                              <span className="truncate flex-1 min-w-0 font-medium text-sm">
                                 {workspace.name}
                               </span>
                               
                               {/* Tab Actions */}
-                              <div className="flex items-center gap-1 ml-3 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                              <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-all duration-300 flex-shrink-0">
                                 <button
                                   onClick={(e) => handleStartEdit(workspace.id, workspace.name, e)}
-                                  className="p-1.5 text-white/40 hover:text-white/80 hover:bg-white/10 rounded transition-all duration-200"
+                                  className="p-1 text-white/40 hover:text-white/80 hover:bg-white/10 rounded transition-all duration-200"
                                   title="Rename workspace"
                                 >
-                                  <FiEdit2 size={12} />
+                                  <FiEdit2 size={10} />
                                 </button>
                                 
                                 {workspace.id !== 'default' && (
                                   <button
                                     onClick={(e) => handleDeleteWorkspace(workspace.id, workspace.name, e)}
-                                    className="p-1.5 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all duration-200"
+                                    className="p-1 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-all duration-200"
                                     title="Delete workspace"
                                   >
-                                    <FiX size={12} />
+                                    <FiX size={10} />
                                   </button>
                                 )}
                               </div>
@@ -488,10 +510,10 @@ export default function WorkspaceSelector({
 
                   {/* New Workspace Tab */}
                   {isCreating && (
-                    <div className="group relative flex items-center min-w-0 max-w-52 h-12 bg-purple-600/10 text-sm font-medium rounded-lg mx-2 border border-purple-400/20">
-                      <div className="flex items-center min-w-0 flex-1 h-full px-4">
-                        <div className="flex-shrink-0 w-5 h-5 mr-4 flex items-center justify-center">
-                          <FiPlus size={16} className="text-purple-400" />
+                    <div className="group relative flex items-center min-w-[120px] max-w-[200px] h-12 bg-purple-600/10 text-sm font-medium rounded-lg border border-purple-400/20 flex-shrink-0">
+                      <div className="flex items-center min-w-0 flex-1 h-full px-3">
+                        <div className="flex-shrink-0 w-4 h-4 mr-2 flex items-center justify-center">
+                          <FiPlus size={14} className="text-purple-400" />
                         </div>
                         <input
                           ref={newWorkspaceInputRef}
@@ -502,18 +524,18 @@ export default function WorkspaceSelector({
                           className="flex-1 bg-transparent border-b border-white/30 text-white text-sm focus:outline-none focus:border-purple-400 min-w-0 py-1"
                           placeholder="Workspace name"
                         />
-                        <div className="flex items-center gap-1 ml-3">
+                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
                           <button
                             onClick={handleSaveNewWorkspace}
-                            className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-400/10 rounded transition-all duration-200"
+                            className="p-1 text-green-400 hover:text-green-300 hover:bg-green-400/10 rounded transition-all duration-200"
                           >
-                            <FiCheck size={12} />
+                            <FiCheck size={10} />
                           </button>
                           <button
                             onClick={handleCancelNewWorkspace}
-                            className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-all duration-200"
+                            className="p-1 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-all duration-200"
                           >
-                            <FiX size={12} />
+                            <FiX size={10} />
                           </button>
                         </div>
                       </div>
@@ -801,6 +823,12 @@ export default function WorkspaceSelector({
         }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
+        }
+        
+        /* Ensure only horizontal scrolling */
+        .scrollbar-hide {
+          overflow-y: hidden !important;
+          overscroll-behavior-y: none;
         }
         
         @keyframes slide-in-from-top {

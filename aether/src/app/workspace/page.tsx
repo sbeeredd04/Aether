@@ -207,7 +207,7 @@ export default function WorkspacePage() {
                   'Your workspace will now be saved automatically. You can disable this anytime in settings.',
                   4000
                 );
-              }
+    }
             },
             () => {
               if (mounted) {

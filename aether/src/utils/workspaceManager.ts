@@ -8,6 +8,7 @@ export interface WorkspaceMetadata {
   totalMessages: number;
   totalNodes: number;
   isActive: boolean;
+  icon?: string; // Optional icon name
 }
 
 export interface WorkspaceData {
@@ -242,6 +243,32 @@ class WorkspaceManager {
       return true;
     } catch (error) {
       logger.error('WorkspaceManager: Failed to rename workspace', { workspaceId, error });
+      return false;
+    }
+  }
+
+  // Update workspace icon
+  updateWorkspaceIcon(workspaceId: string, iconName: string): boolean {
+    if (!this.isBrowser()) return false;
+
+    try {
+      const workspaces = this.getWorkspaces();
+      const workspaceIndex = workspaces.findIndex(ws => ws.id === workspaceId);
+      
+      if (workspaceIndex === -1) {
+        logger.warn('WorkspaceManager: Workspace not found for icon update', { workspaceId });
+        return false;
+      }
+
+      workspaces[workspaceIndex].icon = iconName;
+      workspaces[workspaceIndex].lastModified = Date.now();
+      
+      this.saveWorkspacesList(workspaces);
+      
+      logger.info('WorkspaceManager: Updated workspace icon', { workspaceId, iconName });
+      return true;
+    } catch (error) {
+      logger.error('WorkspaceManager: Failed to update workspace icon', { workspaceId, error });
       return false;
     }
   }

@@ -54,25 +54,45 @@ class WorkspaceManager {
     return `workspace_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Get all workspaces metadata
+  // Get all workspaces metadata with caching
+  private _cachedWorkspaces: WorkspaceMetadata[] | null = null;
+  private _cacheTimestamp: number = 0;
+  private readonly CACHE_DURATION = 5000; // 5 seconds cache
+
   getWorkspaces(): WorkspaceMetadata[] {
     if (!this.isBrowser()) return [];
+
+    // Return cached data if still valid
+    const now = Date.now();
+    if (this._cachedWorkspaces && (now - this._cacheTimestamp) < this.CACHE_DURATION) {
+      return this._cachedWorkspaces;
+    }
 
     try {
       const stored = localStorage.getItem(WORKSPACE_KEYS.WORKSPACES_LIST);
       if (!stored) {
         // Create default workspace if none exist
         const defaultWorkspace = this.createDefaultWorkspace();
+        this._cachedWorkspaces = [defaultWorkspace];
+        this._cacheTimestamp = now;
         return [defaultWorkspace];
       }
 
       const workspaces: WorkspaceMetadata[] = JSON.parse(stored);
+      this._cachedWorkspaces = workspaces;
+      this._cacheTimestamp = now;
       logger.debug('WorkspaceManager: Retrieved workspaces', { count: workspaces.length });
       return workspaces;
     } catch (error) {
       logger.error('WorkspaceManager: Failed to get workspaces', { error });
       return [];
     }
+  }
+
+  // Clear cache when workspaces are modified
+  private clearCache(): void {
+    this._cachedWorkspaces = null;
+    this._cacheTimestamp = 0;
   }
 
   // Create default workspace
@@ -100,6 +120,8 @@ class WorkspaceManager {
 
     try {
       localStorage.setItem(WORKSPACE_KEYS.WORKSPACES_LIST, JSON.stringify(workspaces));
+      // Clear cache when data is updated
+      this.clearCache();
       logger.debug('WorkspaceManager: Saved workspaces list', { count: workspaces.length });
     } catch (error) {
       logger.error('WorkspaceManager: Failed to save workspaces list', { error });

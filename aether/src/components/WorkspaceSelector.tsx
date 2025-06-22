@@ -606,120 +606,108 @@ export default function WorkspaceSelector({
             </div>
           )}
 
-          {/* Expanded Mode - Now for detailed info and management */}
+          {/* Expanded Mode - Compact and intuitive design */}
           {isExpanded && (
-            <div className="p-6 space-y-5 min-w-96 animate-in slide-in-from-top-2 duration-500 ease-out">
-              {/* Header with Logo */}
+            <div className="p-4 space-y-3 w-full animate-in slide-in-from-top-2 duration-300 ease-out">
+              {/* Header */}
               <div className="flex items-center justify-between">
                 <button
                   onClick={toggleExpanded}
-                  className="flex items-center gap-3 text-white hover:text-purple-300 transition-all duration-500 ease-out"
+                  className="flex items-center gap-2 text-white hover:text-purple-300 transition-all duration-300"
                 >
-                  <div className="transition-transform duration-700 ease-out rotate-180">
+                  <div className="transition-transform duration-500 rotate-180">
                     <Image 
                       src="/aether.svg" 
                       alt="Aether AI" 
-                      width={isMobile ? 32 : 36} 
-                      height={isMobile ? 32 : 36}
+                      width={24} 
+                      height={24}
                       className="filter brightness-110"
                     />
                   </div>
-                  <span className={`font-major-mono font-medium ${isMobile ? 'text-xl' : 'text-2xl'}`}>
-                    Workspace Manager
+                  <span className="font-major-mono font-medium text-lg">
+                    Workspaces
                   </span>
                 </button>
 
                 {/* Action Icons */}
-                <div className="flex items-center gap-2">
-                  <span className="text-white/40 text-sm mr-3">{workspaces.length} workspace{workspaces.length !== 1 ? 's' : ''}</span>
-                  
+                <div className="flex items-center gap-1">
                   {!isMobile && onToggleSidebar && (
                     <button
                       onClick={onToggleSidebar}
-                      className="p-2.5 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                       title="Toggle sidebar"
                     >
-                      <BsLayoutSidebarInsetReverse size={18} />
+                      <BsLayoutSidebarInsetReverse size={16} />
                     </button>
                   )}
                   
                   <Link 
                     href="/" 
-                    className="p-2.5 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                    className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                     title="Home"
                   >
-                    <FiHome size={18} />
+                    <FiHome size={16} />
                   </Link>
                   
                   {onShowModelInfo && (
                     <button
                       onClick={onShowModelInfo}
-                      className="p-2.5 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                       title="Model info"
                     >
-                      <FaInfo size={16} />
+                      <FaInfo size={14} />
                     </button>
                   )}
                   
                   {onShowSettings && (
                     <button
                       onClick={onShowSettings}
-                      className="p-2.5 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-300 hover:scale-105"
+                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                       title="Settings"
                     >
-                      <FiSettings size={18} />
+                      <FiSettings size={16} />
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Current Workspace Info */}
+              {/* Current Workspace Info - Compact */}
               {currentWorkspace && (
-                <div className="bg-purple-600/20 border border-purple-400/30 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-white font-medium text-lg">Current Workspace</h3>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => handleStartEdit(currentWorkspace.id, currentWorkspace.name, e)}
-                        className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded transition-all"
-                        title="Rename workspace"
-                      >
-                        <FiEdit2 size={14} />
-                      </button>
-                    </div>
+                <div className="bg-purple-600/15 border border-purple-400/25 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-purple-200 text-sm font-medium">Active Workspace</span>
+                    <button
+                      onClick={(e) => handleStartEdit(currentWorkspace.id, currentWorkspace.name, e)}
+                      className="p-1 text-white/60 hover:text-white hover:bg-white/10 rounded transition-all"
+                      title="Rename workspace"
+                    >
+                      <FiEdit2 size={12} />
+                    </button>
                   </div>
-                  <h4 className="text-purple-200 font-medium text-xl mb-3">{currentWorkspace.name}</h4>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-white">{currentWorkspace.totalMessages}</div>
-                      <div className="text-white/60">Messages</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-white">{currentWorkspace.totalNodes}</div>
-                      <div className="text-white/60">Nodes</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-sm font-medium text-white">
-                        {new Date(currentWorkspace.lastModified).toLocaleDateString()}
-                      </div>
-                      <div className="text-white/60">Modified</div>
-                    </div>
+                  <div className="font-medium text-white mb-2">{currentWorkspace.name}</div>
+                  <div className="flex gap-4 text-xs text-white/60">
+                    <span>{currentWorkspace.totalMessages} messages</span>
+                    <span>{currentWorkspace.totalNodes} nodes</span>
+                    <span>{new Date(currentWorkspace.lastModified).toLocaleDateString()}</span>
                   </div>
                 </div>
               )}
 
-              {/* All Workspaces List */}
+              {/* Workspaces List - Compact */}
               <div>
-                <h3 className="text-white font-medium mb-3">All Workspaces</h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white/80 text-sm font-medium">All Workspaces</span>
+                  <span className="text-white/40 text-xs">{workspaces.length} total</span>
+                </div>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
                   {workspaces.map((workspace) => (
                     <div
                       key={workspace.id}
                       className={`
-                        flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all
+                        group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all text-sm
                         ${workspace.id === currentWorkspace?.id
-                          ? 'bg-purple-600/30 border border-purple-400/50' 
-                          : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20'
+                          ? 'bg-purple-600/25 border border-purple-400/40' 
+                          : 'bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15'
                         }
                       `}
                       onClick={() => handleWorkspaceSelect(workspace.id)}
@@ -728,26 +716,32 @@ export default function WorkspaceSelector({
                         <div className="font-medium text-white truncate">
                           {workspace.name}
                         </div>
-                        <div className="text-xs text-white/60">
-                          {workspace.totalMessages} messages • {workspace.totalNodes} nodes
+                        <div className="text-xs text-white/50">
+                          {workspace.totalMessages}m • {workspace.totalNodes}n
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-1 ml-2">
+                      <div className="flex items-center gap-0.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={(e) => handleExportWorkspace(workspace.id, workspace.name)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportWorkspace(workspace.id, workspace.name);
+                          }}
                           className="p-1 text-white/40 hover:text-white/80 transition-colors"
                           title="Export workspace"
                         >
-                          <FiDownload size={12} />
+                          <FiDownload size={11} />
                         </button>
                         {workspace.id !== 'default' && (
                           <button
-                            onClick={(e) => handleDeleteWorkspace(workspace.id, workspace.name, e)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteWorkspace(workspace.id, workspace.name, e);
+                            }}
                             className="p-1 text-red-400/60 hover:text-red-400 transition-colors"
                             title="Delete workspace"
                           >
-                            <FiX size={12} />
+                            <FiX size={11} />
                           </button>
                         )}
                       </div>
@@ -756,48 +750,35 @@ export default function WorkspaceSelector({
                 </div>
               </div>
 
-              {/* Management Actions */}
+              {/* Actions - Compact */}
               <div className="flex items-center justify-between pt-2 border-t border-white/10">
                 <button
                   onClick={handleCreateWorkspace}
-                  className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-400/50 rounded-lg text-white/90 hover:text-white transition-all text-sm"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-400/50 rounded-lg text-white/90 hover:text-white transition-all text-sm"
                 >
-                  <FiPlus size={16} />
-                  New Workspace
+                  <FiPlus size={14} />
+                  New
                 </button>
 
-                {/* Import/Export Menu */}
-                <div className="relative" ref={menuRef}>
+                <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setShowMenu(!showMenu)}
-                    className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all"
-                    title="Import/Export options"
+                    onClick={handleImportWorkspace}
+                    className="flex items-center gap-1.5 px-2 py-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all text-sm"
+                    title="Import workspace"
                   >
-                    <FiMoreHorizontal size={18} />
+                    <FiUpload size={14} />
+                    Import
                   </button>
-
-                  {/* Dropdown Menu */}
-                  {showMenu && (
-                    <div className="absolute top-full right-0 mt-2 w-48 bg-black/90 backdrop-blur-md border border-white/20 rounded-lg shadow-xl z-50">
-                      <div className="py-2">
-                        <button
-                          onClick={handleImportWorkspace}
-                          className="w-full px-4 py-2 text-left text-white/80 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-3"
-                        >
-                          <FiUpload size={16} />
-                          Import Workspace
-                        </button>
-                        {currentWorkspace && (
-                          <button
-                            onClick={() => handleExportWorkspace(currentWorkspace.id, currentWorkspace.name)}
-                            className="w-full px-4 py-2 text-left text-white/80 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-3"
-                          >
-                            <FiDownload size={16} />
-                            Export Current
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                  
+                  {currentWorkspace && (
+                    <button
+                      onClick={() => handleExportWorkspace(currentWorkspace.id, currentWorkspace.name)}
+                      className="flex items-center gap-1.5 px-2 py-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all text-sm"
+                      title="Export current workspace"
+                    >
+                      <FiDownload size={14} />
+                      Export
+                    </button>
                   )}
                 </div>
               </div>

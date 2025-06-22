@@ -72,6 +72,43 @@ body::before {
   }
 }
 
+/* SVG Path Drawing Animation */
+@keyframes draw-path {
+  0% {
+    stroke-dashoffset: 1130;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes draw-path-delayed {
+  0%, 30% {
+    stroke-dashoffset: 1130;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.animate-draw-path {
+  animation: draw-path 2s ease-in-out infinite;
+}
+
+.animate-draw-path-delayed {
+  animation: draw-path-delayed 2s ease-in-out infinite;
+}
+
 /* Fullscreen modal */
 .modal-fullscreen {
   @apply fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8;

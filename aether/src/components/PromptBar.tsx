@@ -60,8 +60,14 @@ export default function PromptBar({
 }: PromptBarProps) {
   // Early return check BEFORE any hooks
   if (!node) {
-    logger.warn('PromptBar: No active node provided');
-    return null;
+    logger.debug('PromptBar: No active node provided, waiting for initialization');
+    return (
+      <div className="w-full flex justify-center items-end pointer-events-none">
+        <div className="w-full max-w-3xl bg-neutral-900/80 backdrop-blur-md border border-white/10 rounded-2xl shadow-lg flex items-center justify-center p-4 pointer-events-auto">
+          <div className="text-white/60 text-sm">Loading workspace...</div>
+        </div>
+      </div>
+    );
   }
 
   const [input, setInput] = useState('');
@@ -90,6 +96,7 @@ export default function PromptBar({
   const addMessageToNode = useChatStore((s) => s.addMessageToNode);
   const getPathToNode = useChatStore((s) => s.getPathToNode);
   const removeLastMessageFromNode = useChatStore((s) => s.removeLastMessageFromNode);
+  const hasStorageConsent = useChatStore((s) => s.hasStorageConsent);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

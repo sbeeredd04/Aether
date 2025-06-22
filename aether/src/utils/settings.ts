@@ -4,12 +4,12 @@ const SETTINGS_KEY = 'aether-settings';
 
 export interface AppSettings {
   apiKey: string;
-  streamingEnabled: boolean;
+  storageEnabled: boolean;
 }
 
 export const defaultSettings: AppSettings = {
   apiKey: '',
-  streamingEnabled: true, // Default to enabled
+  storageEnabled: true, // Default to enabled
 };
 
 /**
@@ -26,9 +26,9 @@ export function loadSettings(): AppSettings {
       const settings = JSON.parse(saved);
       const result = {
         apiKey: settings.apiKey || defaultSettings.apiKey,
-        streamingEnabled: settings.streamingEnabled !== undefined 
-          ? settings.streamingEnabled 
-          : defaultSettings.streamingEnabled,
+        storageEnabled: settings.storageEnabled !== undefined 
+          ? settings.storageEnabled 
+          : defaultSettings.storageEnabled,
       };
       
       return result;
@@ -53,7 +53,7 @@ export function saveSettings(settings: AppSettings): void {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     console.log('🔧 Settings: Saved', {
       hasApiKey: !!settings.apiKey,
-      streamingEnabled: settings.streamingEnabled
+      storageEnabled: settings.storageEnabled
     });
   } catch (error) {
     console.error('🔧 Settings: Failed to save to localStorage', error);
@@ -69,12 +69,12 @@ export function getApiKey(): string {
 }
 
 /**
- * Check if streaming is enabled
+ * Check if storage is enabled
  */
-export function isStreamingEnabled(): boolean {
+export function isStorageEnabled(): boolean {
   const settings = loadSettings();
-  console.log('🔧 Settings: Streaming check', { streamingEnabled: settings.streamingEnabled });
-  return settings.streamingEnabled;
+  console.log('🔧 Settings: Storage check', { storageEnabled: settings.storageEnabled });
+  return settings.storageEnabled;
 }
 
 /**

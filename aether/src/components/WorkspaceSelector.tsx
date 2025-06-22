@@ -314,13 +314,65 @@ export default function WorkspaceSelector({
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
-      const workspaceId = workspaceManager.importWorkspace(content);
-      if (workspaceId) {
-        loadWorkspaces();
-        onWorkspaceChange(workspaceId);
-        showToast('success', 'Import Complete', 'Workspace imported successfully');
-      } else {
-        showToast('error', 'Import Failed', 'Failed to import workspace. Please check the file format.');
+      
+      try {
+        const data = JSON.parse(content);
+        
+        // Check if it's a single workspace or multiple workspaces
+        if (data.workspaces && Array.isArray(data.workspaces)) {
+          // Multiple workspaces import
+          let importedCount = 0;
+          let lastWorkspaceId = '';
+          
+          data.workspaces.forEach((wsData: any) => {
+            if (wsData.metadata && wsData.data) {
+              const workspaceId = workspaceManager.createWorkspace(wsData.metadata.name + ' (Imported)');
+              if (workspaceId) {
+                // Save the workspace data
+                workspaceManager.saveWorkspaceData(workspaceId, {
+                  name: wsData.metadata.name + ' (Imported)',
+                  nodes: wsData.data.nodes || [],
+                  edges: wsData.data.edges || [],
+                  activeNodeId: wsData.data.activeNodeId || null,
+                  timestamp: Date.now(),
+                  version: wsData.data.version || '1.0',
+                  metadata: {
+                    totalMessages: wsData.data.metadata?.totalMessages || 0,
+                    totalAttachments: wsData.data.metadata?.totalAttachments || 0,
+                    createdAt: Date.now(),
+                    lastModified: Date.now(),
+                    dataSize: wsData.data.metadata?.dataSize || 0
+                  }
+                });
+                importedCount++;
+                lastWorkspaceId = workspaceId;
+              }
+            }
+          });
+          
+          if (importedCount > 0) {
+            loadWorkspaces();
+            if (lastWorkspaceId) {
+              onWorkspaceChange(lastWorkspaceId);
+            }
+            showToast('success', 'Import Complete', `Imported ${importedCount} workspace${importedCount > 1 ? 's' : ''} successfully`);
+          } else {
+            showToast('error', 'Import Failed', 'No valid workspaces found in the file');
+          }
+        } else {
+          // Single workspace import (legacy)
+          const workspaceId = workspaceManager.importWorkspace(content);
+          if (workspaceId) {
+            loadWorkspaces();
+            onWorkspaceChange(workspaceId);
+            showToast('success', 'Import Complete', 'Workspace imported successfully');
+          } else {
+            showToast('error', 'Import Failed', 'Failed to import workspace. Please check the file format.');
+          }
+        }
+      } catch (error) {
+        showToast('error', 'Import Failed', 'Invalid file format. Please select a valid workspace export file.');
+        logger.error('Failed to parse import file', { error });
       }
     };
     reader.readAsText(file);
@@ -764,7 +816,7 @@ export default function WorkspaceSelector({
                   <button
                     onClick={handleImportWorkspace}
                     className="flex items-center gap-1.5 px-2 py-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all text-sm"
-                    title="Import workspace"
+                    title="Import workspace(s) - supports single workspace or multiple workspaces from export"
                   >
                     <FiUpload size={14} />
                     Import

@@ -412,6 +412,74 @@ class WorkspaceManager {
     }
   }
 
+  // Import multiple workspaces
+  importAllWorkspaces(importData: string): number {
+    try {
+      const parsed = JSON.parse(importData);
+      
+      if (!parsed.workspaces || !Array.isArray(parsed.workspaces)) {
+        throw new Error('Invalid multi-workspace export format');
+      }
+
+      let importedCount = 0;
+      const existingWorkspaces = this.getWorkspaces();
+
+      parsed.workspaces.forEach((wsData: any) => {
+        if (wsData.metadata && wsData.data) {
+          try {
+            const newWorkspaceId = this.generateWorkspaceId();
+            const workspaceName = `${wsData.metadata.name} (Imported)`;
+
+            // Create workspace metadata
+            const newWorkspace: WorkspaceMetadata = {
+              id: newWorkspaceId,
+              name: workspaceName,
+              createdAt: Date.now(),
+              lastModified: Date.now(),
+              totalMessages: wsData.data.metadata?.totalMessages || 0,
+              totalNodes: wsData.data.nodes?.length || 1,
+              isActive: false
+            };
+
+            existingWorkspaces.push(newWorkspace);
+
+            // Save workspace data
+            this.saveWorkspaceData(newWorkspaceId, {
+              name: workspaceName,
+              nodes: wsData.data.nodes || [],
+              edges: wsData.data.edges || [],
+              activeNodeId: wsData.data.activeNodeId || null,
+              timestamp: Date.now(),
+              version: wsData.data.version || '1.0',
+              metadata: {
+                totalMessages: wsData.data.metadata?.totalMessages || 0,
+                totalAttachments: wsData.data.metadata?.totalAttachments || 0,
+                createdAt: Date.now(),
+                lastModified: Date.now(),
+                dataSize: wsData.data.metadata?.dataSize || 0
+              }
+            });
+
+            importedCount++;
+          } catch (error) {
+            logger.error('WorkspaceManager: Failed to import individual workspace', { error, workspace: wsData.metadata?.name });
+          }
+        }
+      });
+
+      // Save updated workspaces list
+      if (importedCount > 0) {
+        this.saveWorkspacesList(existingWorkspaces);
+      }
+
+      logger.info('WorkspaceManager: Imported multiple workspaces', { importedCount });
+      return importedCount;
+    } catch (error) {
+      logger.error('WorkspaceManager: Failed to import multiple workspaces', { error });
+      return 0;
+    }
+  }
+
   // Clear all workspaces (for testing/reset)
   clearAllWorkspaces(): void {
     if (!this.isBrowser()) return;

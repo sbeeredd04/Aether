@@ -513,7 +513,7 @@ export default function WorkspacePage() {
             {isSidebarOpen && (
               <div className="relative h-full flex">
                 <div 
-                  className="w-[4px] h-full cursor-ew-resize group z-50 bg-white/5 hover:bg-white/10 transition-colors flex items-center justify-center" 
+                  className="w-[6px] h-full cursor-ew-resize group z-50 bg-white/5 hover:bg-white/10 transition-colors flex items-center justify-center" 
                   onMouseDown={startResize}
                 >
                   <div className="w-[2px] h-8 bg-white/40 group-hover:bg-purple-400 transition-colors rounded-full"></div>

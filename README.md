@@ -142,14 +142,100 @@ For detailed usage instructions, see our [User Guide](./docs/USER_GUIDE.md).
 
 ## Architecture
 
+Aether AI is built on a modern, client-first architecture that prioritizes performance, privacy, and developer experience.
+
 ### Tech Stack
 
-- **Frontend**: Next.js 15, React 19, TypeScript
-- **Visualization**: React Flow
-- **Styling**: Tailwind CSS 4
-- **State Management**: Zustand
-- **AI Integration**: Google Generative AI
-- **Markdown**: React Markdown with syntax highlighting
+```mermaid
+graph LR
+    subgraph "Frontend Layer"
+        A[Next.js 15] --> B[React 19]
+        B --> C[TypeScript]
+        C --> D[Tailwind CSS 4]
+    end
+    
+    subgraph "State & Data"
+        E[Zustand Store] --> F[React Flow]
+        F --> G[Browser Storage]
+    end
+    
+    subgraph "AI Integration"
+        H[Google Gemini API] --> I[Web Grounding]
+        I --> J[Multimodal Processing]
+    end
+    
+    subgraph "Infrastructure"
+        K[Vercel Platform] --> L[Edge Functions]
+        L --> M[CDN Distribution]
+    end
+    
+    A -.-> E
+    E -.-> H
+    H -.-> K
+    
+    style A fill:#000000,stroke:#ffffff,color:#ffffff
+    style H fill:#4285f4,stroke:#ffffff,color:#ffffff
+    style E fill:#ff6b35,stroke:#ffffff,color:#ffffff
+    style K fill:#000000,stroke:#ffffff,color:#ffffff
+```
+
+### Core Technologies
+
+| Category | Technology | Purpose |
+|----------|------------|---------|
+| **Framework** | Next.js 15 with App Router | React framework with SSR capabilities |
+| **Language** | TypeScript | Type-safe development |
+| **Styling** | Tailwind CSS 4 | Utility-first styling system |
+| **State Management** | Zustand | Lightweight state management |
+| **Graph Visualization** | React Flow | Interactive node-based interface |
+| **AI Integration** | Google Generative AI | Advanced AI model access |
+| **Content Processing** | React Markdown | Rich text rendering with syntax highlighting |
+| **Deployment** | Vercel | Serverless deployment platform |
+
+### System Architecture
+
+```mermaid
+graph TD
+    subgraph "Client Application"
+        A[Landing Page] --> B[Workspace Interface]
+        B --> C[Graph Visualization]
+        C --> D[Chat Nodes]
+        D --> E[Context Sidebar]
+    end
+    
+    subgraph "State Management"
+        F[Zustand Store] --> G[Node Management]
+        G --> H[Edge Management]
+        H --> I[Storage Management]
+    end
+    
+    subgraph "External Services"
+        J[Google Gemini] --> K[Web Search]
+        K --> L[Content Generation]
+    end
+    
+    subgraph "Data Layer"
+        M[Session Storage] --> N[Local Storage]
+        N --> O[Export/Import]
+    end
+    
+    B --> F
+    F --> J
+    F --> M
+    
+    style F fill:#8b5cf6,stroke:#ffffff,color:#ffffff
+    style J fill:#4285f4,stroke:#ffffff,color:#ffffff
+    style M fill:#10b981,stroke:#ffffff,color:#ffffff
+```
+
+### Key Features Architecture
+
+- **Visual Conversation Trees**: Transform linear chats into explorable graphs
+- **Multiple AI Models**: Support for various Gemini models with different capabilities
+- **Persistent Storage**: Consent-based local storage with automatic compression
+- **Real-time Streaming**: Live AI response generation with progress indicators
+- **File Processing**: Multi-format file upload with intelligent context integration
+- **Web Grounding**: Real-time web search integration for enhanced responses
 
 ### Project Structure
 

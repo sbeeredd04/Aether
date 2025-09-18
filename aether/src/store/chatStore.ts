@@ -510,8 +510,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       hasApiKey: !!apiKey,
       apiKeyLength: apiKey?.length || 0 
     });
-    set({ chatManager: new ChatManager(apiKey) });
-    logger.debug('ChatStore: Chat manager initialized successfully');
+    
+    // Create callback to save storage when response is received
+    const onResponseReceived = (nodeId: string, response: string) => {
+      logger.debug('ChatStore: Response received callback triggered, saving to storage', { 
+        nodeId, 
+        responseLength: response.length 
+      });
+      get().saveToStorage();
+    };
+    
+    set({ chatManager: new ChatManager(apiKey, onResponseReceived) });
+    logger.debug('ChatStore: Chat manager initialized successfully with response callback');
   },
 
   sendMessageToNode: async (nodeId: string, message: string) => {
@@ -563,7 +573,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       state.addMessageToNode(nodeId, { role: 'model', content: response, modelId: 'chatManager' });
       logger.debug('ChatStore: Model response added to node', { nodeId });
       
-      // Save to storage after successful message
+      // Save to storage after successful message exchange
+      logger.debug('ChatStore: Saving to storage after message response received', { nodeId });
       state.saveToStorage();
     } catch (error) {
       logger.error('ChatStore: sendMessage failed', { 
@@ -575,6 +586,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         content: `Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`,
         modelId: 'error'
       });
+      
+      // Save to storage even after error to preserve the error state
+      logger.debug('ChatStore: Saving to storage after error response', { nodeId });
+      state.saveToStorage();
     }
   },
 
@@ -798,6 +813,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               }));
               
               // Save to storage after title update
+              logger.debug('ChatStore: Saving to storage after title generation', { nodeId, newTitle });
               get().saveToStorage();
             }).catch(error => {
               logger.error('ChatStore: Title generation failed', { 
@@ -818,6 +834,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               }));
               
               // Save to storage after fallback title
+              logger.debug('ChatStore: Saving to storage after fallback title generation', { nodeId, fallbackTitle });
               get().saveToStorage();
             });
           }
@@ -836,6 +853,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     
     // Save to storage after adding message (but not for partial updates to avoid too many saves)
     if (!isPartial) {
+      logger.debug('ChatStore: Saving to storage after adding complete message', { 
+        nodeId, 
+        messageRole: message.role,
+        isPartial: false
+      });
       get().saveToStorage();
     }
   },

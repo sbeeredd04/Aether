@@ -524,6 +524,11 @@ export default function WorkspacePage() {
       useGroundingPipeline: prev.useGroundingPipeline,
       modelSupportsThinking: prev.modelSupportsThinking
     }));
+    
+    // Save to storage after streaming is complete to ensure all conversation data is persisted
+    console.log('🔄 Workspace: Saving to storage after streaming complete');
+    const { saveToStorage } = useChatStore.getState();
+    saveToStorage();
   };
 
   const handleStreamingError = (error: string) => {
@@ -536,6 +541,11 @@ export default function WorkspacePage() {
       isThinkingPhase: false,
       messagePhase: false
     });
+    
+    // Save to storage after streaming error to preserve any partial data
+    console.log('🔄 Workspace: Saving to storage after streaming error');
+    const { saveToStorage } = useChatStore.getState();
+    saveToStorage();
   };
 
 

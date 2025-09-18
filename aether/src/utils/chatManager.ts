@@ -15,13 +15,17 @@ export interface ChatThread {
 export class ChatManager {
   private threads: Map<string, ChatThread> = new Map();
   private ai: GoogleGenAI;
+  private onResponseReceived?: (nodeId: string, response: string) => void;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, onResponseReceived?: (nodeId: string, response: string) => void) {
     if (!apiKey) {
       throw new Error('Google Gemini API key is required.');
     }
     this.ai = new GoogleGenAI({ apiKey });
-    logger.info('ChatManager: Initialized with document support');
+    this.onResponseReceived = onResponseReceived;
+    logger.info('ChatManager: Initialized with document support', { 
+      hasResponseCallback: !!onResponseReceived 
+    });
   }
 
   // Extract documents from message history
@@ -331,6 +335,12 @@ export class ChatManager {
         threadDocuments: thread.documentContext.length,
         historyLength: thread.history.length
       });
+
+      // Trigger callback to save storage after response received
+      if (this.onResponseReceived) {
+        logger.debug('ChatManager: Calling response received callback for storage save', { nodeId });
+        this.onResponseReceived(nodeId, response);
+      }
 
       return response;
     } catch (error) {

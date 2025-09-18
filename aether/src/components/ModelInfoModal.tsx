@@ -156,10 +156,10 @@ export default function ModelInfoModal({ isOpen, onClose }: ModelInfoModalProps)
                       <span className="text-sm">Uses adaptive thinking process</span>
                     </div>
                   )}
-                  {selectedModel.useGroundingPipeline && (
+                  {selectedModel.supportsGrounding && (
                     <div className="flex items-center gap-2 text-white/70">
                       <FaSearch className="text-blue-400" />
-                      <span className="text-sm">Enhanced with grounding pipeline</span>
+                      <span className="text-sm">Enhanced with Google Search grounding</span>
                     </div>
                   )}
                 </div>
@@ -175,32 +175,12 @@ export default function ModelInfoModal({ isOpen, onClose }: ModelInfoModalProps)
                         <li>Multi-modal content analysis</li>
                       </ul>
                     )}
-                    {selectedModel.id === 'gemini-2.5-flash-web-thinking' && (
+                    {selectedModel.id === 'gemini-2.5-flash' && (
                       <ul className="list-disc list-inside space-y-1">
-                        <li>Research tasks requiring current information</li>
-                        <li>Fact-checking and verification</li>
-                        <li>Questions about recent events or trends</li>
-                      </ul>
-                    )}
-                    {selectedModel.id === 'gemini-2.0-flash' && (
-                      <ul className="list-disc list-inside space-y-1">
-                        <li>Real-time streaming conversations</li>
-                        <li>Latest generation AI capabilities</li>
-                        <li>Speed-critical applications</li>
-                      </ul>
-                    )}
-                    {selectedModel.id === 'gemini-2.0-flash-preview-image-generation' && (
-                      <ul className="list-disc list-inside space-y-1">
-                        <li>Creative image generation and editing</li>
-                        <li>Visual content creation</li>
-                        <li>Artistic and design projects</li>
-                      </ul>
-                    )}
-                    {selectedModel.id === 'gemini-2.0-flash-lite' && (
-                      <ul className="list-disc list-inside space-y-1">
-                        <li>High-volume processing tasks</li>
-                        <li>Cost-sensitive applications</li>
-                        <li>Low-latency requirements</li>
+                        <li>Adaptive thinking and reasoning</li>
+                        <li>Web search and grounding capabilities</li>
+                        <li>Document understanding and analysis</li>
+                        <li>Cost-efficient high-performance tasks</li>
                       </ul>
                     )}
                   </div>

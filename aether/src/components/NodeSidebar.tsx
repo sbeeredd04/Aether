@@ -20,7 +20,6 @@ interface StreamingState {
   thoughtStartTime?: number;
   thoughtEndTime?: number;
   groundingEnabled?: boolean;
-  useGroundingPipeline?: boolean;
   modelSupportsThinking?: boolean;
   groundingMetadata?: {
     searchEntryPoint?: {
@@ -480,10 +479,10 @@ export default function NodeSidebar({
 
   // Helper for model name with support for different models
   const getModelName = (modelId?: string) => {
-    if (!modelId) return 'Gemini 2.0 Flash';
+    if (!modelId) return 'Gemini 2.5 Flash';
     
     // You can expand this to support more models
-    if (modelId.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
+    if (modelId.includes('gemini-2.5-flash')) return 'Gemini 2.5 Flash';
     if (modelId.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro';
     if (modelId.includes('gemini-1.5-flash')) return 'Gemini 1.5 Flash';
     if (modelId.includes('gpt-4')) return 'GPT-4';
@@ -492,7 +491,7 @@ export default function NodeSidebar({
     return modelId; // Fallback to model ID
   };
   
-  const isGeminiModel = (modelId?: string) => (modelId || 'gemini-2.0-flash').toLowerCase().includes('gemini');
+  const isGeminiModel = (modelId?: string) => (modelId || 'gemini-2.5-flash').toLowerCase().includes('gemini');
 
   return (
     <div 
@@ -852,7 +851,6 @@ export default function NodeSidebar({
                         
                         // Determine if grounding is actually enabled for this request
                         const isActuallyGroundingEnabled = streamingState?.groundingEnabled === true;
-                        const isUsingGroundingPipeline = streamingState?.useGroundingPipeline === true;
                         const modelSupportsThinking = streamingState?.modelSupportsThinking === true;
                         
                         // Show loading state based on actual pipeline configuration
@@ -860,14 +858,13 @@ export default function NodeSidebar({
                           // Show specific loading message from the grounding pipeline
                           const loadingText = streamingState.groundingMetadata?.loadingMessage;
                           
-                          console.log('🔍 NODESIDEBAR DEBUG: Showing specific loading state from pipeline', {
+                          console.log('🔍 NODESIDEBAR DEBUG: Showing specific loading state', {
                             messageIndex: idx,
                             nodeId: nodeId,
                             isStreaming: streamingState.isStreaming,
                             hasGroundingMetadata,
                             hasLoadingMessage,
                             isActuallyGroundingEnabled,
-                            isUsingGroundingPipeline,
                             loadingText,
                             modelId: (msg as any).modelId
                           });

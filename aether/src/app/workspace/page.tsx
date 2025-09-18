@@ -29,7 +29,6 @@ interface StreamingState {
   thoughtStartTime?: number;
   thoughtEndTime?: number;
   groundingEnabled?: boolean;
-  useGroundingPipeline?: boolean;
   modelSupportsThinking?: boolean;
   groundingMetadata?: {
     searchEntryPoint?: {
@@ -459,7 +458,7 @@ export default function WorkspacePage() {
   };
 
   // Streaming event handlers for PromptBar
-  const handleStreamingStart = (config: { groundingEnabled: boolean; useGroundingPipeline: boolean; modelSupportsThinking: boolean; }) => {
+  const handleStreamingStart = (config: { groundingEnabled: boolean; modelSupportsThinking: boolean; }) => {
     console.log('🔄 Workspace: Streaming started', config);
     setStreamingState({
       isStreaming: true,
@@ -470,7 +469,6 @@ export default function WorkspacePage() {
       messagePhase: false,
       thoughtStartTime: Date.now(),
       groundingEnabled: config.groundingEnabled,
-      useGroundingPipeline: config.useGroundingPipeline,
       modelSupportsThinking: config.modelSupportsThinking
     });
   };
@@ -521,7 +519,6 @@ export default function WorkspacePage() {
       thoughtStartTime: prev.thoughtStartTime,
       thoughtEndTime: prev.thoughtEndTime || Date.now(),
       groundingEnabled: prev.groundingEnabled,
-      useGroundingPipeline: prev.useGroundingPipeline,
       modelSupportsThinking: prev.modelSupportsThinking
     }));
     

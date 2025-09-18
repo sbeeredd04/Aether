@@ -1,5 +1,4 @@
-import { generateContent, generateContentStream, generateContentStreamWithGrounding, GroundedTextResponse } from '@/utils/gemini';
-import { executeGroundingPipeline, extractCitationsFromGrounding } from '@/utils/groundingPipeline';
+import { generateContent, generateContentStream, GroundedTextResponse } from '@/utils/gemini';
 import serverLogger from '@/utils/serverLogger';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -10,7 +9,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { apiKey, modelId, history, prompt, attachments, ttsOptions, grounding, enableThinking, useGroundingPipeline, stream } = body;
+    const { apiKey, modelId, history, prompt, attachments, grounding, enableThinking, stream } = body;
     
     // Default to streaming enabled if not specified
     const useStreaming = stream !== undefined ? stream : true;
@@ -29,8 +28,7 @@ export async function POST(req: NextRequest) {
         att.type.includes('python')
       ).length || 0,
       enableThinking,
-      useStreaming,
-      useGroundingPipeline: !!useGroundingPipeline
+      useStreaming
     });
 
     // Validate request
@@ -57,53 +55,22 @@ export async function POST(req: NextRequest) {
       const streamResponse = new ReadableStream({
         async start(controller) {
           try {
-            // Determine which streaming method to use based on model and toggles
-            let streamGenerator;
+            // Use standard streaming with native Google Search grounding
+            console.log(`🔍 API STREAMING DEBUG: Using standard streaming with native grounding`, {
+              requestId,
+              modelId,
+              groundingEnabled: grounding?.enabled
+            });
             
-            // Check if model uses grounding pipeline AND grounding is enabled
-            if (useGroundingPipeline && grounding?.enabled) {
-              console.log(`🔍 API STREAMING DEBUG: Using streaming grounding pipeline`, {
-                requestId,
-                modelId,
-                useGroundingPipeline,
-                groundingEnabled: grounding.enabled
-              });
-              
-              serverLogger.info('🔄 API: Using streaming grounding pipeline', { requestId, modelId });
-              
-              streamGenerator = generateContentStreamWithGrounding(
-                apiKey,
-                history,
-                prompt,
-                modelId,
-                attachments,
-                ttsOptions,
-                grounding,
-                enableThinking
-              );
-            } else {
-              console.log(`🔍 API STREAMING DEBUG: Using standard streaming`, {
-                requestId,
-                modelId,
-                useGroundingPipeline: !!useGroundingPipeline,
-                groundingEnabled: grounding?.enabled,
-                reason: !useGroundingPipeline ? "Model doesn't use grounding pipeline" : "Grounding not enabled"
-              });
-              
-              // Use standard streaming - only pass grounding if model supports it directly
-              const modelSupportsDirectGrounding = !useGroundingPipeline && grounding?.enabled;
-              
-              streamGenerator = generateContentStream(
-                apiKey,
-                history,
-                prompt,
-                modelId,
-                attachments,
-                ttsOptions,
-                modelSupportsDirectGrounding ? grounding : undefined, // Only pass grounding for direct support
-                enableThinking
-              );
-            }
+            const streamGenerator = generateContentStream(
+              apiKey,
+              history,
+              prompt,
+              modelId,
+              attachments,
+              grounding, // Pass grounding directly - Gemini 2.5 Flash supports it natively
+              enableThinking
+            );
 
             let chunkCount = 0;
             for await (const chunk of streamGenerator) {
@@ -188,73 +155,29 @@ export async function POST(req: NextRequest) {
     serverLogger.info('API: Non-streaming request', { requestId, modelId });
     let result: any;
 
-    // Check if grounding pipeline should be used based on model and toggles
-    if (useGroundingPipeline && grounding?.enabled) {
-      console.log(`🔍 API DEBUG: Using grounding pipeline`, {
-        requestId,
-        modelId,
-        useGroundingPipeline,
-        groundingEnabled: grounding.enabled,
-        enableThinking
-      });
+    // Use direct Gemini API with native Google Search grounding
+    console.log(`🔍 API DEBUG: Using direct Gemini API with native grounding`, {
+      requestId,
+      modelId,
+      groundingEnabled: grounding?.enabled
+    });
 
-      serverLogger.info('API: Using grounding pipeline', { requestId });
+    result = await generateContent(
+      apiKey,
+      history,
+      prompt,
+      modelId,
+      attachments,
+      grounding, // Pass grounding directly - Gemini 2.5 Flash supports it natively
+      enableThinking
+    );
 
-      const groundingResult = await executeGroundingPipeline(
-        apiKey,
-        history,
-        prompt,
-        attachments,
-        enableThinking
-      );
-
-      console.log(`🔍 API DEBUG: Grounding pipeline result`, {
-        requestId,
-        textLength: groundingResult.text.length,
-        citationsCount: groundingResult.citations?.length || 0,
-        searchQueriesCount: groundingResult.searchQueries?.length || 0,
-        hasSearchEntryPoint: !!groundingResult.searchEntryPoint
-      });
-
-      result = {
-        text: groundingResult.text,
-        groundingMetadata: {
-          searchEntryPoint: groundingResult.searchEntryPoint ? { renderedContent: groundingResult.searchEntryPoint } : undefined,
-          webSearchQueries: groundingResult.searchQueries,
-          citations: groundingResult.citations
-        }
-      };
-    } else {
-      console.log(`🔍 API DEBUG: Using direct Gemini API`, {
-        requestId,
-        modelId,
-        useGroundingPipeline: !!useGroundingPipeline,
-        groundingEnabled: grounding?.enabled,
-        directGroundingSupported: !!grounding?.enabled && !useGroundingPipeline,
-        reason: !useGroundingPipeline ? "Model doesn't use grounding pipeline" : "Grounding not enabled"
-      });
-
-      // Use direct API - only pass grounding if model supports it directly (not via pipeline)
-      const modelSupportsDirectGrounding = !useGroundingPipeline && grounding?.enabled;
-
-      result = await generateContent(
-        apiKey,
-        history,
-        prompt,
-        modelId,
-        attachments,
-        ttsOptions,
-        modelSupportsDirectGrounding ? grounding : undefined, // Only pass grounding for direct support
-        enableThinking
-      );
-
-      console.log(`🔍 API DEBUG: Direct Gemini API result`, {
-        requestId,
-        resultType: 'text' in result ? 'text' : 'other',
-        hasGroundingMetadata: 'groundingMetadata' in result && !!result.groundingMetadata,
-        textLength: 'text' in result ? result.text.length : 0
-      });
-    }
+    console.log(`🔍 API DEBUG: Direct Gemini API result`, {
+      requestId,
+      resultType: 'text' in result ? 'text' : 'other',
+      hasGroundingMetadata: 'groundingMetadata' in result && !!result.groundingMetadata,
+      textLength: 'text' in result ? result.text.length : 0
+    });
     
     serverLogger.info('API: Non-streaming complete', { 
       requestId,

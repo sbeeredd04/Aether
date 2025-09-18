@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSearch, FiVolume2, FiUpload, FiFileText, FiCpu, FiGlobe, FiSquare, FiEdit3 } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSearch, FiUpload, FiFileText, FiCpu, FiGlobe, FiSquare, FiEdit3 } from 'react-icons/fi';
 import { FaStop } from "react-icons/fa";
 import { IoOptionsOutline } from "react-icons/io5";
 import { LuBrain } from "react-icons/lu";
 import { TbBrandGoogle } from "react-icons/tb";
 import { useChatStore } from '../store/chatStore';
-import { models, getTTSVoices, getModelById } from '../utils/models';
+import { models, getModelById } from '../utils/models';
 import logger from '../utils/logger';
 
 interface PromptBarProps {
@@ -18,7 +18,7 @@ interface PromptBarProps {
   onClearVoiceTranscript?: () => void;
   isMobile?: boolean;
   // Streaming callbacks
-  onStreamingStart?: (config: { groundingEnabled: boolean; useGroundingPipeline: boolean; modelSupportsThinking: boolean; }) => void;
+  onStreamingStart?: (config: { groundingEnabled: boolean; modelSupportsThinking: boolean; }) => void;
   onStreamingThought?: (thought: string) => void;
   onStreamingMessage?: (messageChunk: string) => void;
   onStreamingGrounding?: (metadata: any) => void;
@@ -40,10 +40,6 @@ interface Attachment {
   previewUrl: string;
 }
 
-interface TTSOptions {
-  voiceName?: string;
-  multiSpeaker?: Array<{ speaker: string; voiceName: string }>;
-}
 
 interface GroundingOptions {
   enabled: boolean;
@@ -85,9 +81,8 @@ export default function PromptBar({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedModel, setSelectedModel] = useState(models[0].id); // Default to first model (Web + Thinking)
   const [enableThinking, setEnableThinking] = useState(true);
-  const [ttsOptions, setTtsOptions] = useState<TTSOptions>({});
   const [grounding, setGrounding] = useState<GroundingOptions>({ 
-    enabled: models[0]?.useGroundingPipeline || false, // Enable grounding for Web + Thinking by default
+    enabled: models[0]?.supportsGrounding || false, // Enable grounding for models that support it
     dynamicThreshold: 0.3 
   });
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(!isMobile);
@@ -122,10 +117,9 @@ export default function PromptBar({
       selectedModel,
       attachmentsCount: attachments.length,
       enableThinking,
-      groundingEnabled: grounding.enabled,
-      hasTtsOptions: !!ttsOptions.voiceName || !!ttsOptions.multiSpeaker
+      groundingEnabled: grounding.enabled
     });
-  }, [node?.id, isLoading, selectedModel, attachments.length, enableThinking, grounding.enabled, ttsOptions]);
+  }, [node?.id, isLoading, selectedModel, attachments.length, enableThinking, grounding.enabled]);
 
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -159,8 +153,6 @@ export default function PromptBar({
   }, [editingState]);
 
   const selectedModelDef = models.find(m => m.id === selectedModel);
-  const isAudioOnlyModel = selectedModelDef?.isMultimedia === 'audio' && !selectedModelDef?.apiModel.includes('-live-');
-  const isTTSModel = selectedModelDef?.capabilities?.tts;
   const supportsThinking = selectedModelDef?.isThinking;
   const supportsGrounding = selectedModelDef?.supportsGrounding;
   const supportsAudioInput = selectedModelDef?.supportedInputs.includes('audio');
@@ -175,8 +167,6 @@ export default function PromptBar({
       apiModel: selectedModelDef.apiModel,
       capabilities: selectedModelDef.capabilities
     } : null,
-    isAudioOnlyModel,
-    isTTSModel,
     supportsThinking,
     supportsGrounding,
     supportsAudioInput
@@ -184,16 +174,13 @@ export default function PromptBar({
 
   // Disable send button for certain conditions
   const shouldDisableSend = isLoading || 
-    (!input.trim() && attachments.length === 0) ||
-    (isAudioOnlyModel && !isTTSModel && true); // TODO: Add voice input check
+    (!input.trim() && attachments.length === 0);
 
   logger.debug('PromptBar: Send button state', {
     shouldDisableSend,
     isLoading,
     hasInput: !!input.trim(),
-    hasAttachments: attachments.length > 0,
-    isAudioOnlyModel,
-    isTTSModel
+    hasAttachments: attachments.length > 0
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -451,16 +438,11 @@ export default function PromptBar({
       requestPayload.grounding = grounding;
     }
 
-    if (isTTSModel && (ttsOptions.voiceName || ttsOptions.multiSpeaker)) {
-      requestPayload.ttsOptions = ttsOptions;
-    }
 
-    // Add grounding pipeline flag if model supports it
+    // Ensure grounding settings are properly set
     const currentModel = getModelById(selectedModel);
-    if (currentModel?.useGroundingPipeline) {
-      requestPayload.useGroundingPipeline = true;
-      // Ensure grounding is enabled for pipeline
-      requestPayload.grounding = { enabled: true, dynamicThreshold: 0.3 };
+    if (currentModel?.supportsGrounding && grounding.enabled) {
+      requestPayload.grounding = grounding;
     }
 
     // Make API call
@@ -508,7 +490,6 @@ export default function PromptBar({
     // Notify that streaming started with configuration
     const streamingConfig = {
       groundingEnabled: grounding.enabled,
-      useGroundingPipeline: !!currentModel?.useGroundingPipeline,
       modelSupportsThinking: !!supportsThinking
     };
     onStreamingStart?.(streamingConfig);
@@ -701,8 +682,7 @@ export default function PromptBar({
       selectedModel,
       attachmentsCount: attachments.length,
       enableThinking,
-      groundingEnabled: grounding.enabled,
-      hasTtsOptions: !!ttsOptions.voiceName || !!ttsOptions.multiSpeaker
+      groundingEnabled: grounding.enabled
     });
 
     if (!input.trim() && attachments.length === 0) {
@@ -859,7 +839,6 @@ export default function PromptBar({
         historyLength: history.length,
         enableThinking: supportsThinking ? enableThinking : undefined,
         groundingEnabled: supportsGrounding ? grounding.enabled : undefined,
-        hasTtsOptions: isTTSModel && (!!ttsOptions.voiceName || !!ttsOptions.multiSpeaker),
         streamingEnabled
       });
 
@@ -882,16 +861,11 @@ export default function PromptBar({
         requestPayload.grounding = grounding;
       }
 
-      if (isTTSModel && (ttsOptions.voiceName || ttsOptions.multiSpeaker)) {
-        requestPayload.ttsOptions = ttsOptions;
-      }
 
-      // Add grounding pipeline flag if model supports it
+      // Ensure grounding settings are properly set
       const currentModel = getModelById(selectedModel);
-      if (currentModel?.useGroundingPipeline) {
-        requestPayload.useGroundingPipeline = true;
-        // Ensure grounding is enabled for pipeline
-        requestPayload.grounding = { enabled: true, dynamicThreshold: 0.3 };
+      if (currentModel?.supportsGrounding && grounding.enabled) {
+        requestPayload.grounding = grounding;
       }
 
       // Make API call with abort signal
@@ -928,7 +902,6 @@ export default function PromptBar({
         // Notify that streaming started with configuration
         const streamingConfig = {
           groundingEnabled: grounding.enabled,
-          useGroundingPipeline: !!currentModel?.useGroundingPipeline,
           modelSupportsThinking: !!supportsThinking
         };
         onStreamingStart?.(streamingConfig);
@@ -1274,7 +1247,6 @@ export default function PromptBar({
     }
   };
 
-  const ttsVoices = getTTSVoices();
 
   return (
     <div className="w-full flex justify-center items-end pointer-events-none">
@@ -1375,25 +1347,6 @@ export default function PromptBar({
               </div>
             )}
 
-            {/* TTS Options - Simplified for mobile */}
-            {isTTSModel && !isMobile && (
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm text-white/80">
-                  <FiVolume2 size={16} />
-                  Voice Options
-                </label>
-                <select
-                  value={ttsOptions.voiceName || ''}
-                  onChange={(e) => setTtsOptions(prev => ({ ...prev, voiceName: e.target.value || undefined }))}
-                  className="w-full bg-neutral-800 text-white text-sm rounded px-2 py-1 border border-white/10"
-                >
-                  <option value="">Default Voice</option>
-                  {ttsVoices.map(voice => (
-                    <option key={voice.id} value={voice.id}>{voice.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
         )}
 
@@ -1406,7 +1359,7 @@ export default function PromptBar({
                     <img src={att.previewUrl} alt={att.file.name} className={`${isMobile ? 'h-12 w-12' : 'h-16 w-16'} object-cover rounded-md`} />
                   ) : att.file.type.startsWith('audio/') ? (
                     <div className={`${isMobile ? 'h-12 w-20' : 'h-16 w-24'} flex flex-col items-center justify-center text-white p-1 rounded-md`}>
-                      <FiVolume2 size={isMobile ? 16 : 20} />
+                      <FiFileText size={isMobile ? 16 : 20} />
                       <span className={`${isMobile ? 'text-xs' : 'text-xs'} truncate w-full text-center mt-1`}>{att.file.name}</span>
                     </div>
                   ) : att.file.type === 'application/pdf' ? (
@@ -1510,7 +1463,7 @@ export default function PromptBar({
                   className={`text-white/70 hover:text-white transition-colors ${isMobile ? 'p-1' : 'p-1.5'} rounded-full hover:bg-white/10`}
                   title="Upload Audio"
                 >
-                  <FiVolume2 size={isMobile ? 16 : 20} />
+                  <FiFileText size={isMobile ? 16 : 20} />
                 </button>
                 <input 
                   type="file" 
@@ -1541,11 +1494,8 @@ export default function PromptBar({
                   // Reset thinking toggle based on model support
                   setEnableThinking(!!newModelDef?.isThinking);
                   
-                  // Reset grounding toggle based on model support and pipeline usage
-                  if (newModelDef?.useGroundingPipeline) {
-                    // For models that use grounding pipeline, enable grounding by default
-                    setGrounding({ enabled: true, dynamicThreshold: 0.3 });
-                  } else if (newModelDef?.supportsGrounding) {
+                  // Reset grounding toggle based on model support
+                  if (newModelDef?.supportsGrounding) {
                     // For models that support direct grounding, keep it disabled by default
                     setGrounding({ enabled: false, dynamicThreshold: 0.3 });
                   } else {
@@ -1553,8 +1503,6 @@ export default function PromptBar({
                     setGrounding({ enabled: false, dynamicThreshold: 0.3 });
                   }
                   
-                  // Reset TTS options
-                  setTtsOptions({});
                 }}
                 className={`bg-transparent ${isMobile ? 'text-xs' : 'text-sm'} text-white/80 outline-none border-none pr-2 ${
                   isMobile ? 'h-6 min-w-[100px]' : 'h-8'

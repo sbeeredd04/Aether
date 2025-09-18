@@ -191,7 +191,7 @@ export class ChatManager {
 
     // Create the chat instance with complete history
     const chat = this.ai.chats.create({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       history: formattedHistory,
     });
 

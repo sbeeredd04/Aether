@@ -35,7 +35,7 @@ export async function makeChatRequest(options: ChatRequestOptions) {
 
   const requestBody = {
     apiKey: options.apiKey || settings.apiKey,
-    modelId: options.modelId || 'gemini-2.5-flash-preview-05-20',
+    modelId: options.modelId || 'gemini-2.5-flash',
     history: options.history,
     prompt: options.prompt,
     attachments: options.attachments,

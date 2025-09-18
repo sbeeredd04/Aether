@@ -37,9 +37,9 @@ export interface ModelDefinition {
   
   export const models: ModelDefinition[] = [
     {
-      id: 'gemini-2.5-flash-preview-05-20',
+      id: 'gemini-2.5-flash',
       name: 'Gemini 2.5 Flash Preview',
-      apiModel: 'gemini-2.5-flash-preview-05-20',
+      apiModel: 'gemini-2.5-flash',
       isThinking: true, // Adaptive thinking
       supportedInputs: ['text', 'audio', 'image', 'video', 'document'],
       supportedOutputs: ['text'],
@@ -55,7 +55,7 @@ export interface ModelDefinition {
     {
       id: 'gemini-2.5-flash-web-thinking',
       name: 'Gemini 2.5 Flash Web + Thinking',
-      apiModel: 'gemini-2.5-flash-preview-05-20',
+      apiModel: 'gemini-2.5-flash',
       isThinking: true,
       supportedInputs: ['text', 'audio', 'image', 'video', 'document'],
       supportedOutputs: ['text'],

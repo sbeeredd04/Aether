@@ -168,7 +168,7 @@ export default function ModelInfoModal({ isOpen, onClose }: ModelInfoModalProps)
                 <div className="bg-white/5 rounded-lg p-4">
                   <h4 className="font-semibold text-white/90 mb-2">Best Use Cases</h4>
                   <div className="text-sm text-white/70 space-y-1">
-                    {selectedModel.id === 'gemini-2.5-flash-preview-05-20' && (
+                    {selectedModel.id === 'gemini-2.5-flash' && (
                       <ul className="list-disc list-inside space-y-1">
                         <li>Complex reasoning tasks requiring deep thinking</li>
                         <li>Cost-effective high-quality responses</li>

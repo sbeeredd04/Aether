@@ -214,7 +214,7 @@ Please provide a thoughtful response that incorporates the grounded information 
         apiKey,
         history, // Include conversation history for better context
         contextPrompt,
-        "gemini-2.5-flash-preview-05-20",
+        "gemini-2.5-flash",
         attachments,
         undefined,
         undefined,

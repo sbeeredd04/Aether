@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSearch, FiVolume2, FiUpload, FiFileText, FiCpu, FiGlobe, FiSquare } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiX, FiPlus, FiMic, FiSearch, FiVolume2, FiUpload, FiFileText, FiCpu, FiGlobe, FiSquare, FiEdit3 } from 'react-icons/fi';
 import { FaStop } from "react-icons/fa";
 import { IoOptionsOutline } from "react-icons/io5";
 import { LuBrain } from "react-icons/lu";
@@ -24,6 +24,15 @@ interface PromptBarProps {
   onStreamingGrounding?: (metadata: any) => void;
   onStreamingComplete?: () => void;
   onStreamingError?: (error: string) => void;
+  // Edit mode props
+  editingState?: {
+    isEditing: boolean;
+    messageIndex: number;
+    nodeId: string;
+    originalContent: string;
+  } | null;
+  onCancelEdit?: () => void;
+  onCompleteEdit?: () => void;
 }
 
 interface Attachment {
@@ -55,7 +64,10 @@ export default function PromptBar({
   onStreamingMessage,
   onStreamingGrounding,
   onStreamingComplete,
-  onStreamingError
+  onStreamingError,
+  editingState,
+  onCancelEdit,
+  onCompleteEdit
 }: PromptBarProps) {
   // Early return check BEFORE any hooks
   if (!node) {
@@ -96,6 +108,8 @@ export default function PromptBar({
   const getPathToNode = useChatStore((s) => s.getPathToNode);
   const removeLastMessageFromNode = useChatStore((s) => s.removeLastMessageFromNode);
   const hasStorageConsent = useChatStore((s) => s.hasStorageConsent);
+  const editMessageAndResend = useChatStore((s) => s.editMessageAndResend);
+  const initializeChatManager = useChatStore((s) => s.initializeChatManager);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,6 +145,18 @@ export default function PromptBar({
       onClearVoiceTranscript?.();
     }
   }, [voiceTranscript, onClearVoiceTranscript]);
+
+  // Handle edit mode
+  useEffect(() => {
+    if (editingState?.isEditing) {
+      setInput(editingState.originalContent);
+      logger.info('PromptBar: Edit mode activated', { 
+        messageIndex: editingState.messageIndex,
+        nodeId: editingState.nodeId,
+        contentLength: editingState.originalContent.length
+      });
+    }
+  }, [editingState]);
 
   const selectedModelDef = models.find(m => m.id === selectedModel);
   const isAudioOnlyModel = selectedModelDef?.isMultimedia === 'audio' && !selectedModelDef?.apiModel.includes('-live-');
@@ -293,7 +319,382 @@ export default function PromptBar({
     });
   };
 
+  // Handle edit and resend
+  const handleEditAndResend = async () => {
+    if (!editingState || !input.trim()) return;
+    
+    logger.info('PromptBar: Starting edit and resend', {
+      nodeId: editingState.nodeId,
+      messageIndex: editingState.messageIndex,
+      newContent: input.substring(0, 100) + (input.length > 100 ? '...' : '')
+    });
+
+    setIsLoading(true);
+
+    try {
+      // First, edit the message and remove subsequent messages using the store's edit function
+      const state = useChatStore.getState();
+      
+      // Find the correct node and local index
+      const pathNodeIds = state.getPathNodeIds(editingState.nodeId);
+      let currentIndex = 0;
+      let messageNodeId = '';
+      let localIndex = -1;
+
+      for (const id of pathNodeIds) {
+        const node = state.nodes.find(n => n.id === id);
+        if (node && node.data.chatHistory) {
+          const nodeMessageCount = node.data.chatHistory.length;
+          
+          if (editingState.messageIndex >= currentIndex && editingState.messageIndex < currentIndex + nodeMessageCount) {
+            messageNodeId = id;
+            localIndex = editingState.messageIndex - currentIndex;
+            break;
+          }
+          
+          currentIndex += nodeMessageCount;
+        }
+      }
+
+      if (localIndex === -1) {
+        throw new Error('Message not found');
+      }
+
+      // Edit the message and remove subsequent messages
+      state.editMessageAndRemoveSubsequent(messageNodeId, localIndex, input.trim());
+
+      // Now proceed with the same API flow as normal message sending
+      await handleEditApiCall();
+      
+    } catch (error) {
+      logger.error('PromptBar: Edit and resend failed', { error });
+      onStreamingError?.(error instanceof Error ? error.message : 'Edit failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Separate function to handle the API call for edited messages
+  const handleEditApiCall = async () => {
+    if (!editingState) return;
+
+    // Get the updated conversation path (should now end with our edited message)
+    const state = useChatStore.getState();
+    const pathMessages = state.getPathToNode(editingState.nodeId);
+    logger.debug('PromptBar: Retrieved path messages after edit', { 
+      pathLength: pathMessages.length 
+    });
+
+    // Extract attachments from the edited message (if any)
+    const editedMessage = pathMessages[pathMessages.length - 1];
+    const attachmentData = (editedMessage?.role === 'user' && editedMessage.attachments) ? editedMessage.attachments : [];
+
+    // Get API settings
+    const savedSettings = localStorage.getItem('aether-settings');
+    if (!savedSettings) {
+      throw new Error('API key not found.');
+    }
+    
+    const settings = JSON.parse(savedSettings);
+    const apiKey = settings.apiKey;
+    if (!apiKey) {
+      throw new Error('API key is empty.');
+    }
+
+    // Build history for API (same format as normal message)
+    const history = pathMessages.flatMap((msg) => {
+      const parts: any[] = [{ text: msg.content }];
+      if(msg.attachments) {
+        msg.attachments.forEach(att => {
+          parts.unshift({
+            inlineData: {
+              mimeType: att.type,
+              data: att.data,
+            }
+          })
+        })
+      }
+      return [ { role: msg.role, parts } ];
+    });
+
+    // Always enable streaming by default
+    const streamingEnabled = true;
+    logger.info('PromptBar: Edit streaming preference', { streamingEnabled });
+
+    logger.info('PromptBar: Making edit API request', {
+      endpoint: '/api/chat',
+      modelId: selectedModel,
+      hasPrompt: !!input,
+      attachmentsCount: attachmentData.length,
+      historyLength: history.length,
+      enableThinking: supportsThinking ? enableThinking : undefined,
+      groundingEnabled: supportsGrounding ? grounding.enabled : undefined,
+      streamingEnabled
+    });
+
+    // Prepare request payload (same as normal message)
+    const requestPayload: any = {
+      apiKey,
+      modelId: selectedModel,
+      history,
+      prompt: input,
+      attachments: attachmentData,
+      stream: streamingEnabled,
+    };
+
+    // Add model-specific options
+    if (supportsThinking) {
+      requestPayload.enableThinking = enableThinking;
+    }
+
+    if (supportsGrounding) {
+      requestPayload.grounding = grounding;
+    }
+
+    if (isTTSModel && (ttsOptions.voiceName || ttsOptions.multiSpeaker)) {
+      requestPayload.ttsOptions = ttsOptions;
+    }
+
+    // Add grounding pipeline flag if model supports it
+    const currentModel = getModelById(selectedModel);
+    if (currentModel?.useGroundingPipeline) {
+      requestPayload.useGroundingPipeline = true;
+      // Ensure grounding is enabled for pipeline
+      requestPayload.grounding = { enabled: true, dynamicThreshold: 0.3 };
+    }
+
+    // Make API call
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestPayload),
+    });
+    
+    logger.info('PromptBar: Edit API response received', { 
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      isStreaming: streamingEnabled
+    });
+
+    if (!response.ok) {
+      logger.error('PromptBar: Edit API response not ok', { 
+        status: response.status,
+        statusText: response.statusText 
+      });
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+
+    // Handle streaming response (same logic as normal message)
+    await handleEditStreamingResponse(response, currentModel);
+    
+    // Clear input and complete edit
+    setInput('');
+    onCompleteEdit?.();
+    
+    logger.info('PromptBar: Edit and resend completed successfully');
+  };
+
+  // Handle streaming response for edited messages
+  const handleEditStreamingResponse = async (response: Response, currentModel: any) => {
+    if (!editingState) return;
+
+    logger.info('PromptBar: Processing edit streaming response');
+    
+    if (!response.body) {
+      throw new Error('No response body for streaming');
+    }
+
+    // Notify that streaming started with configuration
+    const streamingConfig = {
+      groundingEnabled: grounding.enabled,
+      useGroundingPipeline: !!currentModel?.useGroundingPipeline,
+      modelSupportsThinking: !!supportsThinking
+    };
+    onStreamingStart?.(streamingConfig);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    let fullMessage = '';
+    let fullThoughts = '';
+    let audioData: string | undefined;
+
+    // Create placeholder message for streaming updates
+    const placeholderMessage = { 
+      role: 'model' as const, 
+      content: '',
+      modelId: selectedModel
+    };
+    addMessageToNode(editingState.nodeId, placeholderMessage, false);
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          logger.info('PromptBar: Edit streaming complete');
+          break;
+        }
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              switch (data.type) {
+                case 'thought':
+                  fullThoughts += data.content;
+                  logger.debug('PromptBar: Received edit thought chunk', { length: data.content.length });
+                  onStreamingThought?.(data.content);
+                  
+                  // Update the placeholder message with thoughts
+                  const { nodes } = useChatStore.getState();
+                  const currentNode = nodes.find(n => n.id === editingState.nodeId);
+                  if (currentNode && currentNode.data.chatHistory.length > 0) {
+                    const lastMessage = currentNode.data.chatHistory[currentNode.data.chatHistory.length - 1];
+                    if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
+                      const currentContent = fullThoughts ? 
+                        `**Thoughts:**\n${fullThoughts}${fullMessage ? `\n\n---\n\n**Answer:**\n${fullMessage}` : ''}` : 
+                        fullMessage;
+                      lastMessage.content = currentContent;
+                      // Trigger re-render
+                      useChatStore.setState({ nodes: [...nodes] });
+                    }
+                  }
+                  break;
+                  
+                case 'message':
+                  fullMessage += data.content;
+                  logger.debug('PromptBar: Received edit message chunk', { length: data.content.length });
+                  onStreamingMessage?.(data.content);
+                  
+                  // Update the placeholder message with accumulated content
+                  const { nodes: messageNodes } = useChatStore.getState();
+                  const messageCurrentNode = messageNodes.find(n => n.id === editingState.nodeId);
+                  if (messageCurrentNode && messageCurrentNode.data.chatHistory.length > 0) {
+                    const lastMessage = messageCurrentNode.data.chatHistory[messageCurrentNode.data.chatHistory.length - 1];
+                    if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
+                      const currentContent = fullThoughts ? 
+                        `**Thoughts:**\n${fullThoughts}\n\n---\n\n**Answer:**\n${fullMessage}` : 
+                        fullMessage;
+                      lastMessage.content = currentContent;
+                      // Trigger re-render
+                      useChatStore.setState({ nodes: [...messageNodes] });
+                    }
+                  }
+                  break;
+                  
+                case 'grounding':
+                  if (data.groundingMetadata) {
+                    logger.debug('PromptBar: Received edit grounding metadata', { 
+                      citationsCount: data.groundingMetadata.citations?.length || 0,
+                      searchQueriesCount: data.groundingMetadata.webSearchQueries?.length || 0
+                    });
+                    onStreamingGrounding?.(data.groundingMetadata);
+                    
+                    // Update the placeholder message with grounding metadata
+                    const { nodes: groundingNodes } = useChatStore.getState();
+                    const groundingCurrentNode = groundingNodes.find(n => n.id === editingState.nodeId);
+                    if (groundingCurrentNode && groundingCurrentNode.data.chatHistory.length > 0) {
+                      const lastMessage = groundingCurrentNode.data.chatHistory[groundingCurrentNode.data.chatHistory.length - 1];
+                      if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
+                        (lastMessage as any).groundingMetadata = data.groundingMetadata;
+                        useChatStore.setState({ nodes: [...groundingNodes] });
+                      }
+                    }
+                  } else if (data.content) {
+                    // Handle loading state messages (like "Searching the web...")
+                    logger.debug('PromptBar: Received edit grounding loading state', { 
+                      content: data.content
+                    });
+                    
+                    // Notify about the loading state
+                    onStreamingGrounding?.({ loadingMessage: data.content });
+                  }
+                  break;
+                  
+                case 'complete':
+                  if (data.audioData) {
+                    audioData = data.audioData;
+                    logger.info('PromptBar: Received edit audio data', { length: data.audioData.length });
+                  }
+                  logger.info('PromptBar: Edit streaming response complete', { 
+                    messageLength: fullMessage.length,
+                    thoughtsLength: fullThoughts.length,
+                    hasAudio: !!audioData
+                  });
+                  onStreamingComplete?.();
+                  break;
+                  
+                case 'error':
+                  logger.error('PromptBar: Edit streaming error', { error: data.content });
+                  onStreamingError?.(data.content);
+                  throw new Error(data.content);
+                  
+                default:
+                  logger.warn('PromptBar: Unknown edit chunk type', { type: data.type });
+              }
+            } catch (e) {
+              logger.warn('PromptBar: Failed to parse edit chunk', { line });
+            }
+          }
+        }
+      }
+
+      // Final update with complete message and audio if available
+      const finalContent = fullThoughts ? 
+        `**Thoughts:**\n${fullThoughts}\n\n---\n\n**Answer:**\n${fullMessage}` : 
+        fullMessage;
+
+      const finalMessage: any = { 
+        role: 'model' as const, 
+        content: finalContent,
+        modelId: selectedModel
+      };
+
+      if (audioData) {
+        finalMessage.attachments = [{
+          name: 'audio_response.wav',
+          type: 'audio/wav',
+          data: audioData,
+          previewUrl: `data:audio/wav;base64,${audioData}`
+        }];
+      }
+
+      // Replace the placeholder with final message
+      const { nodes } = useChatStore.getState();
+      const currentNode = nodes.find(n => n.id === editingState.nodeId);
+      if (currentNode && currentNode.data.chatHistory.length > 0) {
+        const lastMessage = currentNode.data.chatHistory[currentNode.data.chatHistory.length - 1];
+        if (lastMessage.role === 'model' && lastMessage.modelId === selectedModel) {
+          Object.assign(lastMessage, finalMessage);
+          // Preserve grounding metadata if it exists
+          if ((lastMessage as any).groundingMetadata) {
+            finalMessage.groundingMetadata = (lastMessage as any).groundingMetadata;
+          }
+          useChatStore.setState({ nodes: [...nodes] });
+        }
+      }
+
+    } catch (streamingError) {
+      logger.error('PromptBar: Edit streaming failed', { error: streamingError });
+      onStreamingError?.(streamingError instanceof Error ? streamingError.message : 'Streaming failed');
+      throw streamingError;
+    } finally {
+      reader.releaseLock();
+    }
+  };
+
   const handleAskLLM = async () => {
+    // If in edit mode, use edit handler
+    if (editingState?.isEditing) {
+      return handleEditAndResend();
+    }
+
     logger.info('PromptBar: Starting LLM request', { 
       nodeId: node.id,
       prompt: input.substring(0, 100) + (input.length > 100 ? '...' : ''),
@@ -899,8 +1300,20 @@ export default function PromptBar({
           </div>
         )}
         
+        {/* Edit Mode Indicator */}
+        {editingState?.isEditing && (
+          <div className={`${isMobile ? 'p-2' : 'p-3'} border-b border-blue-500/20 bg-blue-900/10`}>
+            <div className="flex items-center gap-2 text-blue-300">
+              <FiEdit3 size={isMobile ? 14 : 16} />
+              <span className={isMobile ? 'text-xs' : 'text-sm'}>
+                Editing message - Make changes and click "Save & Resend"
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Advanced Options Panel */}
-        {showAdvancedOptions && (
+        {showAdvancedOptions && !editingState?.isEditing && (
           <div className={`${isMobile ? 'p-2' : 'p-3'} border-b border-white/10`}>
             <div className={`flex flex-wrap ${isMobile ? 'gap-1' : 'gap-2'}`}>
               {/* Thinking Tag */}
@@ -1191,6 +1604,21 @@ export default function PromptBar({
               <FiMic size={isMobile ? 16 : 20} />
             </button>
             
+            {/* Cancel Edit Button - Only show in edit mode */}
+            {editingState?.isEditing && (
+              <button
+                onClick={onCancelEdit}
+                className={`
+                  ${isMobile ? 'w-8 h-8' : 'w-9 h-9'} rounded-full text-white
+                  flex items-center justify-center transition-colors
+                  bg-gray-600 hover:bg-gray-500 mr-2
+                `}
+                title="Cancel edit"
+              >
+                <FiX size={isMobile ? 14 : 18} />
+              </button>
+            )}
+            
             <button
               onClick={isLoading ? handleCancelRequest : handleAskLLM}
               disabled={shouldDisableSend && !isLoading}
@@ -1199,10 +1627,12 @@ export default function PromptBar({
                 flex items-center justify-center transition-colors
                 ${isLoading 
                   ? 'bg-red-600 hover:bg-red-500' 
-                  : 'bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-600'
+                  : editingState?.isEditing 
+                    ? 'bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-600'
+                    : 'bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-600'
                 }
               `}
-              title={isLoading ? "Stop request" : "Send message"}
+              title={isLoading ? "Stop request" : editingState?.isEditing ? "Save & Resend" : "Send message"}
             >
               {isLoading ? (
                 <FaStop size={isMobile ? 12 : 14} />

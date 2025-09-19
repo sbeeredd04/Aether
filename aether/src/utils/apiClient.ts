@@ -6,10 +6,8 @@ export interface ChatRequestOptions {
   history: any[];
   prompt: string;
   attachments?: any[];
-  ttsOptions?: any;
   grounding?: any;
   enableThinking?: boolean;
-  useGroundingPipeline?: boolean;
   forceStreaming?: boolean; // Override user setting
 }
 
@@ -35,14 +33,12 @@ export async function makeChatRequest(options: ChatRequestOptions) {
 
   const requestBody = {
     apiKey: options.apiKey || settings.apiKey,
-    modelId: options.modelId || 'gemini-2.5-flash-preview-05-20',
+    modelId: options.modelId || 'gemini-2.5-flash',
     history: options.history,
     prompt: options.prompt,
     attachments: options.attachments,
-    ttsOptions: options.ttsOptions,
     grounding: options.grounding,
     enableThinking: options.enableThinking,
-    useGroundingPipeline: options.useGroundingPipeline,
     stream: useStreaming // Pass the streaming preference
   };
 
@@ -68,9 +64,10 @@ export async function handleStreamingResponse(
   response: Response,
   onThought?: (thought: string) => void,
   onMessage?: (messageChunk: string) => void,
-  onComplete?: (fullMessage: string, audioData?: string) => void,
+  onComplete?: (fullMessage: string, audioData?: string, groundingMetadata?: any) => void,
+  onGrounding?: (groundingMetadata: any) => void,
   onError?: (error: string) => void
-): Promise<{ fullMessage: string; fullThoughts: string; audioData?: string }> {
+): Promise<{ fullMessage: string; fullThoughts: string; audioData?: string; groundingMetadata?: any }> {
   
   if (!response.body) {
     throw new Error('No response body for streaming');
@@ -82,6 +79,7 @@ export async function handleStreamingResponse(
   let fullMessage = '';
   let fullThoughts = '';
   let audioData: string | undefined;
+  let groundingMetadata: any;
 
   try {
     while (true) {
@@ -111,11 +109,21 @@ export async function handleStreamingResponse(
                 onMessage?.(data.content);
                 break;
                 
+              case 'grounding':
+                if (data.groundingMetadata) {
+                  groundingMetadata = data.groundingMetadata;
+                  onGrounding?.(data.groundingMetadata);
+                }
+                break;
+                
               case 'complete':
                 if (data.audioData) {
                   audioData = data.audioData;
                 }
-                onComplete?.(fullMessage, audioData);
+                if (data.groundingMetadata) {
+                  groundingMetadata = data.groundingMetadata;
+                }
+                onComplete?.(fullMessage, audioData, groundingMetadata);
                 break;
                 
               case 'error':
@@ -135,7 +143,7 @@ export async function handleStreamingResponse(
     reader.releaseLock();
   }
 
-  return { fullMessage, fullThoughts, audioData };
+  return { fullMessage, fullThoughts, audioData, groundingMetadata };
 }
 
 /**
@@ -162,7 +170,8 @@ export async function sendChatMessage(
   callbacks?: {
     onThought?: (thought: string) => void;
     onMessage?: (messageChunk: string) => void;
-    onComplete?: (fullMessage: string, audioData?: string) => void;
+    onComplete?: (fullMessage: string, audioData?: string, groundingMetadata?: any) => void;
+    onGrounding?: (groundingMetadata: any) => void;
     onError?: (error: string) => void;
   }
 ) {
@@ -179,15 +188,17 @@ export async function sendChatMessage(
       callbacks?.onThought,
       callbacks?.onMessage,
       callbacks?.onComplete,
+      callbacks?.onGrounding,
       callbacks?.onError
     );
   } else {
     const result = await handleNonStreamingResponse(response);
-    callbacks?.onComplete?.(result.text, result.audio?.data);
+    callbacks?.onComplete?.(result.text, result.audio?.data, result.groundingMetadata);
     return {
       fullMessage: result.text || '',
       fullThoughts: '',
-      audioData: result.audio?.data
+      audioData: result.audio?.data,
+      groundingMetadata: result.groundingMetadata
     };
   }
 } 

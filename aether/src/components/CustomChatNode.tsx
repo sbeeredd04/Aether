@@ -1,13 +1,10 @@
 'use client';
 
-import React, { memo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { memo, useCallback, useRef, useEffect } from 'react';
 import { Handle, Position, Node, Edge } from '@xyflow/react';
-import { useChatStore, CustomNodeData, ChatMessage } from '../store/chatStore';
-import { FiPlus, FiRefreshCw, FiTrash2, FiFileText } from 'react-icons/fi';
-import { SiGooglegemini } from 'react-icons/si';
+import { useChatStore, CustomNodeData } from '../store/chatStore';
+import { FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 import logger from '@/utils/logger';
-import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
-import CopyButton from './CopyButton';
 
 function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[] {
   // Returns an array of node IDs from root to targetId
@@ -25,37 +22,20 @@ function getPathNodeIds(nodes: Node[], edges: Edge[], targetId: string): string[
 }
 
 function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isLoading?: boolean; isMobile?: boolean } }) {
-  const isLoading = data.isLoading ?? false;
   const isMobile = data.isMobile ?? false;
-  const [input, setInput] = useState<string>('');
   const { 
-    addMessageToNode, 
     createNodeAndEdge, 
     resetNode, 
-    deleteNodeAndDescendants,
-    sendMessageToNode,
-    initializeChatManager
+    deleteNodeAndDescendants
   } = useChatStore();
   const setActiveNodeId = useChatStore(s => s.setActiveNodeId);
   const activeNodeId = useChatStore(s => s.activeNodeId);
   const activePath = useChatStore(s => s.activePath);
-  const nodes = useChatStore(s => s.nodes);
-  const edges = useChatStore(s => s.edges);
   const isActive = activeNodeId === id;
   const isInActivePath = activePath.nodeIds.includes(id);
   const nodeRef = useRef<HTMLDivElement>(null);
   const isRootNode = id === 'root';
 
-  // Initialize chat manager when component mounts
-  useEffect(() => {
-    const savedSettings = localStorage.getItem('aether-settings');
-    if (savedSettings) {
-      const settings = JSON.parse(savedSettings);
-      if (settings.apiKey) {
-        initializeChatManager(settings.apiKey);
-      }
-    }
-  }, [initializeChatManager]);
 
   // Set node as active when clicked
   useEffect(() => {
@@ -65,33 +45,6 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
   }, [isActive]);
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
-  const lastModelResponse = data.chatHistory.find(msg => msg.role === 'model')?.content || '';
-  const lastUserMessage = data.chatHistory.find(msg => msg.role === 'user')?.content || '';
-  const lastModelMessage = data.chatHistory.slice().reverse().find(msg => msg.role === 'model');
-  const responseHasMarkdown = hasResponse && hasMarkdown(lastModelResponse);
-  const lastMessageHasAttachments = lastModelMessage?.attachments && lastModelMessage.attachments.length > 0;
-
-  const handleInputChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(evt.target.value);
-  };
-
-  const handleAskLLM = useCallback(async () => {
-    if (!input.trim()) return;
-    
-    const userMessage: ChatMessage = { role: 'user', content: input };
-    addMessageToNode(id, userMessage);
-    setInput('');
-    
-    try {
-      await sendMessageToNode(id, input);
-    } catch (error: any) {
-      addMessageToNode(id, { 
-        role: 'model', 
-        content: `Error: ${error.message || error}`,
-        modelId: 'error' // Mark error messages
-      });
-    }
-  }, [id, input, addMessageToNode, sendMessageToNode]);
 
   const handleBranch = useCallback(() => {
     const newNodeId = createNodeAndEdge(id, 'New Chat', 'branch');
@@ -121,9 +74,6 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
     setActiveNodeId(id);
   };
 
-  // Helper for model name (default Gemini)
-  const getModelName = () => 'Gemini 2.0 Flash';
-  const isGeminiModel = (model?: string) => (model || 'gemini-2.0-flash').toLowerCase().includes('gemini');
 
   // Responsive node class
   const nodeClass = `
@@ -139,16 +89,7 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
     ${isInActivePath && !isActive ? 'ring-1 ring-purple-400/50' : ''}
   `;
   
-  const iconButtonClass = 'hover:text-white text-gray-300 transition-colors';
-
-  // Loading dots animation
-  const LoadingDots = () => (
-    <span className="flex gap-1 items-center h-6">
-      <span className="bg-white/80 rounded-full w-2 h-2 animate-bounce [animation-delay:0ms]"></span>
-      <span className="bg-white/60 rounded-full w-2 h-2 animate-bounce [animation-delay:150ms]"></span>
-      <span className="bg-white/40 rounded-full w-2 h-2 animate-bounce [animation-delay:300ms]"></span>
-    </span>
-  );
+  const iconButtonClass = 'hover:text-white text-gray-300 transition-colors p-2 rounded-lg hover:bg-white/10 transition-all';
 
   return (
     <div
@@ -158,8 +99,8 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
       tabIndex={0}
       style={{ 
         position: 'relative', 
-        width: isMobile ? 300 : 450,
-        height: isMobile ? 150 : 200
+        width: isMobile ? 280 : 350,
+        height: isMobile ? 120 : 140
       }}
     >
       {/* Root node indicator - glowing circle */}
@@ -176,123 +117,51 @@ function CustomChatNode({ id, data }: { id: string; data: CustomNodeData & { isL
         className={`${isMobile ? 'w-1.5 h-1.5' : 'w-2 h-2'} ${isInActivePath ? '!bg-purple-400' : '!bg-neutral-400'}`} 
       />
       
-      <div className={`flex justify-between items-center ${isMobile ? 'mb-2' : 'mb-3'}`}>
-        <div className={`font-medium ${isMobile ? 'text-sm' : 'text-base'} truncate flex-1 text-white group relative`}>
-          <div className="flex items-center gap-2">
+      {/* Node Header with Title and Actions */}
+      <div className="flex flex-col h-full">
+        {/* Title Section */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className={`font-medium ${isMobile ? 'text-sm' : 'text-base'} text-center text-white group relative`}>
             {isRootNode ? (
-              <span className="text-purple-400">Root Node</span>
+              <span className="text-purple-400 font-semibold">Root Node</span>
             ) : (
-              <>
-                <span className="text-white/90">{data.label || 'New Chat'}</span>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-white/90 line-clamp-2">{data.label || 'New Chat'}</span>
                 {data.chatHistory.length > 0 && (
                   <span className={`${isMobile ? 'text-xs' : 'text-xs'} text-white/50`}>
-                    ({data.chatHistory.length} messages)
+                    {data.chatHistory.length} messages
                   </span>
                 )}
-              </>
+              </div>
             )}
           </div>
-          {/* Tooltip for long titles */}
-          {data.label && data.label.length > (isMobile ? 20 : 30) && (
-            <div className={`absolute bottom-full left-0 mb-2 px-2 py-1 bg-black/90 text-white ${
-              isMobile ? 'text-xs' : 'text-sm'
-            } rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal max-w-[300px] z-50`}>
-              {data.label}
-            </div>
-          )}
         </div>
-        <div className={`flex ${isMobile ? 'gap-1' : 'gap-2'}`}>
+        
+        {/* Action Buttons */}
+        <div className="flex justify-center items-center gap-2 mt-2">
           {hasResponse && (
             <button 
               onClick={handleBranch} 
               className={iconButtonClass}
               title="Branch Chat"
             >
-              <FiPlus size={isMobile ? 14 : 16} />
+              <FiPlus size={isMobile ? 16 : 18} />
             </button>
           )}
           <button onClick={handleReset} className={iconButtonClass} title="Reset Node">
-            <FiRefreshCw size={isMobile ? 14 : 16} />
+            <FiRefreshCw size={isMobile ? 16 : 18} />
           </button>
           {!isRootNode && (
-            <button onClick={handleDelete} className="text-red-300 hover:text-red-200" title="Delete Node">
-              <FiTrash2 size={isMobile ? 14 : 16} />
+            <button 
+              onClick={handleDelete} 
+              className="text-red-300 hover:text-red-200 p-2 rounded-lg hover:bg-red-900/20 transition-all" 
+              title="Delete Node"
+            >
+              <FiTrash2 size={isMobile ? 16 : 18} />
             </button>
           )}
         </div>
       </div>
-      
-      {hasResponse ? (
-        <div className="relative">
-          {lastMessageHasAttachments && (
-            <div className={`${isMobile ? 'mb-1' : 'mb-2'} flex flex-wrap gap-1`}>
-              {lastModelMessage?.attachments?.map((att, idx) => (
-                <div key={idx} className="relative">
-                  {att.type.startsWith('image/') ? (
-                    <img 
-                      src={att.previewUrl || `data:${att.type};base64,${att.data}`}
-                      alt={att.name}
-                      className={`${isMobile ? 'h-8 w-8' : 'h-12 w-12'} object-cover rounded cursor-pointer hover:scale-105 transition-transform`}
-                      onClick={() => window.open(att.previewUrl || `data:${att.type};base64,${att.data}`, '_blank')}
-                    />
-                  ) : att.type.startsWith('audio/') ? (
-                    <div className={`flex items-center gap-1 bg-neutral-800/50 rounded ${isMobile ? 'px-1 py-0.5' : 'px-2 py-1'}`}>
-                      <FiFileText size={isMobile ? 10 : 12} />
-                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} text-white/80`}>{att.name}</span>
-                    </div>
-                  ) : (
-                    <div className={`flex items-center gap-1 bg-neutral-800/50 rounded ${isMobile ? 'px-1 py-0.5' : 'px-2 py-1'}`}>
-                      <FiFileText size={isMobile ? 10 : 12} />
-                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} text-white/80`}>{att.name}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className={`${isMobile ? 'max-h-[80px]' : 'max-h-[120px]'} overflow-y-auto ${
-            isMobile ? 'mb-1' : 'mb-2'
-          } ${isMobile ? 'text-xs' : 'text-sm'} whitespace-pre-wrap rounded-xl bg-neutral-900/30 ${
-            isMobile ? 'p-2' : 'p-3'
-          } text-white scrollbar-thin scrollbar-thumb-white/70 scrollbar-track-transparent relative`}
-            style={{ scrollbarColor: 'rgba(255,255,255,0.7) transparent', scrollbarWidth: 'thin' }}
-          >
-            {responseHasMarkdown ? (
-              <div className={`markdown-content ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                <MarkdownRenderer content={lastModelResponse} />
-              </div>
-            ) : (
-              <>{lastModelResponse}</>
-            )}
-            
-            {/* Copy button for model responses */}
-            {hasResponse && !isLoading && (
-              <div className={`absolute ${isMobile ? 'top-1 right-1' : 'top-2 right-2'}`}>
-                <CopyButton 
-                  content={lastModelResponse} 
-                  size={isMobile ? 12 : 14} 
-                  className="opacity-60 hover:opacity-100"
-                />
-              </div>
-            )}
-            
-            {/* Gemini logo at bottom right if Gemini model */}
-            {isGeminiModel() && (
-              <div className={`absolute ${isMobile ? 'bottom-1 right-1' : 'bottom-2 right-2'} group`} title={getModelName()}>
-                <span className="group-hover:scale-110 transition-transform cursor-pointer">
-                  <SiGooglegemini size={isMobile ? 16 : 20} className="text-blue-300 drop-shadow-md" />
-                </span>
-              </div>
-            )}
-            {/* Loading animation if isLoading */}
-            {isLoading && (
-              <div className={`absolute ${isMobile ? 'bottom-1 left-1' : 'bottom-2 left-2'}`}>
-                <LoadingDots />
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
       
       <Handle 
         type="source" 

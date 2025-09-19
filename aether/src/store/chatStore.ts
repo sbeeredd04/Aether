@@ -53,6 +53,8 @@ interface ChatState {
   addMessageToNode: (nodeId: string, message: ChatMessage, isPartial?: boolean) => void;
   removeLastMessageFromNode: (nodeId: string) => void;
   updateLastMessageInNode: (nodeId: string, content: string, modelId?: string) => void;
+  editMessageAndRemoveSubsequent: (nodeId: string, messageIndex: number, newContent: string) => void;
+  editMessageAndResend: (targetNodeId: string, messageIndex: number, newContent: string) => Promise<void>;
   createNodeAndEdge: (sourceNodeId: string, label: string, type: 'response' | 'branch') => string; // Return new nodeId
   getPathToNode: (targetNodeId: string) => ChatMessage[];
   getPathNodeIds: (targetNodeId: string) => string[];
@@ -508,8 +510,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       hasApiKey: !!apiKey,
       apiKeyLength: apiKey?.length || 0 
     });
-    set({ chatManager: new ChatManager(apiKey) });
-    logger.debug('ChatStore: Chat manager initialized successfully');
+    
+    // Create callback to save storage when response is received
+    const onResponseReceived = (nodeId: string, response: string) => {
+      logger.debug('ChatStore: Response received callback triggered, saving to storage', { 
+        nodeId, 
+        responseLength: response.length 
+      });
+      get().saveToStorage();
+    };
+    
+    set({ chatManager: new ChatManager(apiKey, onResponseReceived) });
+    logger.debug('ChatStore: Chat manager initialized successfully with response callback');
   },
 
   sendMessageToNode: async (nodeId: string, message: string) => {
@@ -561,7 +573,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       state.addMessageToNode(nodeId, { role: 'model', content: response, modelId: 'chatManager' });
       logger.debug('ChatStore: Model response added to node', { nodeId });
       
-      // Save to storage after successful message
+      // Save to storage after successful message exchange
+      logger.debug('ChatStore: Saving to storage after message response received', { nodeId });
       state.saveToStorage();
     } catch (error) {
       logger.error('ChatStore: sendMessage failed', { 
@@ -573,6 +586,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         content: `Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`,
         modelId: 'error'
       });
+      
+      // Save to storage even after error to preserve the error state
+      logger.debug('ChatStore: Saving to storage after error response', { nodeId });
+      state.saveToStorage();
     }
   },
 
@@ -796,6 +813,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               }));
               
               // Save to storage after title update
+              logger.debug('ChatStore: Saving to storage after title generation', { nodeId, newTitle });
               get().saveToStorage();
             }).catch(error => {
               logger.error('ChatStore: Title generation failed', { 
@@ -816,6 +834,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               }));
               
               // Save to storage after fallback title
+              logger.debug('ChatStore: Saving to storage after fallback title generation', { nodeId, fallbackTitle });
               get().saveToStorage();
             });
           }
@@ -834,6 +853,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     
     // Save to storage after adding message (but not for partial updates to avoid too many saves)
     if (!isPartial) {
+      logger.debug('ChatStore: Saving to storage after adding complete message', { 
+        nodeId, 
+        messageRole: message.role,
+        isPartial: false
+      });
       get().saveToStorage();
     }
   },
@@ -908,6 +932,110 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
     
     // Don't save to session during streaming updates to avoid performance issues
+  },
+
+  editMessageAndRemoveSubsequent: (nodeId, messageIndex, newContent) => {
+    logger.info('ChatStore: Editing message and removing subsequent messages', { 
+      nodeId, 
+      messageIndex, 
+      newContentLength: newContent.length
+    });
+
+    set((state) => {
+      // First, edit the message in the specified node
+      const updatedNodes = state.nodes.map((node) => {
+        if (node.id === nodeId && node.data.chatHistory.length > messageIndex) {
+          const chatHistory = [...node.data.chatHistory];
+          
+          // Edit the message at the specified index
+          if (chatHistory[messageIndex] && chatHistory[messageIndex].role === 'user') {
+            chatHistory[messageIndex] = {
+              ...chatHistory[messageIndex],
+              content: newContent
+            };
+            
+            // Remove all messages after the edited message in this node
+            const updatedChatHistory = chatHistory.slice(0, messageIndex + 1);
+            
+            logger.debug('ChatStore: Message edited and subsequent messages removed from node', { 
+              nodeId,
+              messageIndex,
+              originalLength: chatHistory.length,
+              newLength: updatedChatHistory.length,
+              removedMessages: chatHistory.length - updatedChatHistory.length
+            });
+            
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                chatHistory: updatedChatHistory,
+              },
+            };
+          }
+        }
+        return node;
+      });
+
+      // Now find all descendant nodes of the edited node and remove them entirely
+      const nodesToRemove = new Set<string>();
+      const queue = [nodeId];
+
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        state.edges.forEach((edge) => {
+          if (edge.source === currentId) {
+            if (!nodesToRemove.has(edge.target)) {
+              nodesToRemove.add(edge.target);
+              queue.push(edge.target);
+              logger.debug('ChatStore: Descendant node marked for removal after edit', { 
+                parentId: currentId, 
+                descendantId: edge.target 
+              });
+            }
+          }
+        });
+      }
+
+      // Clean up chat threads for removed nodes
+      nodesToRemove.forEach(id => {
+        state.chatManager?.deleteThread(id);
+        logger.debug('ChatStore: Chat thread deleted for descendant node', { nodeId: id });
+      });
+
+      const finalNodes = updatedNodes.filter((node) => !nodesToRemove.has(node.id));
+      const finalEdges = state.edges.filter((edge) => 
+        !nodesToRemove.has(edge.source) && !nodesToRemove.has(edge.target)
+      );
+
+      logger.info('ChatStore: Edit completed - message edited and descendants removed', { 
+        editedNodeId: nodeId,
+        messageIndex,
+        removedDescendants: nodesToRemove.size,
+        remainingNodes: finalNodes.length,
+        remainingEdges: finalEdges.length
+      });
+
+      return {
+        nodes: finalNodes,
+        edges: finalEdges
+      };
+    });
+    
+    // Save to storage after editing
+    get().saveToStorage();
+  },
+
+  editMessageAndResend: async (targetNodeId: string, messageIndex: number, newContent: string) => {
+    logger.info('ChatStore: Edit message and resend - delegating to PromptBar for proper streaming', { 
+      targetNodeId, 
+      messageIndex, 
+      newContentLength: newContent.length
+    });
+    
+    // This function is now handled by PromptBar's handleEditAndResend for proper streaming support
+    // The actual implementation is in PromptBar.tsx to ensure streaming callbacks work correctly
+    throw new Error('Edit and resend should be handled by PromptBar component for proper streaming support');
   },
 
   createNodeAndEdge: (sourceNodeId, label, type) => {

@@ -29,7 +29,6 @@ interface StreamingState {
   thoughtStartTime?: number;
   thoughtEndTime?: number;
   groundingEnabled?: boolean;
-  useGroundingPipeline?: boolean;
   modelSupportsThinking?: boolean;
   groundingMetadata?: {
     searchEntryPoint?: {
@@ -63,6 +62,7 @@ interface StreamingState {
 
 export default function WorkspacePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Initialize sidebarWidth with a default or ensure it's within bounds on mount
   const [sidebarWidth, setSidebarWidth] = useState(600);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -84,6 +84,14 @@ export default function WorkspacePage() {
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{src: string, title: string} | null>(null);
+  
+  // Edit state
+  const [editingState, setEditingState] = useState<{
+    isEditing: boolean;
+    messageIndex: number;
+    nodeId: string;
+    originalContent: string;
+  } | null>(null);
   
   const resizingRef = useRef(false);
   const startXRef = useRef(0);
@@ -120,10 +128,44 @@ export default function WorkspacePage() {
       setIsMobile(window.innerWidth < 768);
     };
     
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+    const handleResize = () => {
+      checkMobile();
+      
+      // Also ensure sidebar width stays within bounds on window resize
+      if (!isMobile) {
+        const windowWidth = window.innerWidth;
+        const minSidebarWidth = 250;
+        const maxSidebarWidth = windowWidth * 0.75;
+        
+        setSidebarWidth(prevWidth => {
+          if (prevWidth < minSidebarWidth || prevWidth > maxSidebarWidth) {
+            return Math.max(minSidebarWidth, Math.min(prevWidth, maxSidebarWidth));
+          }
+          return prevWidth;
+        });
+      }
+    };
+    
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isMobile]);
+
+  // Ensure initial sidebar width is within bounds
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const windowWidth = window.innerWidth;
+      const minSidebarWidth = 250;
+      const maxSidebarWidth = windowWidth * 0.75;
+      const currentWidth = sidebarWidth;
+      
+      // Only update if current width is outside bounds
+      if (currentWidth < minSidebarWidth || currentWidth > maxSidebarWidth) {
+        const boundedWidth = Math.max(minSidebarWidth, Math.min(currentWidth, maxSidebarWidth));
+        setSidebarWidth(boundedWidth);
+      }
+    }
+  }, []); // Run once on mount
 
   // Auto-switch to chat tab when a node is selected on mobile
   useEffect(() => {
@@ -248,9 +290,18 @@ export default function WorkspacePage() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!resizingRef.current) return;
       
+      const windowWidth = window.innerWidth;
       const newWidth = startWidthRef.current - (e.clientX - startXRef.current);
-      const maxWidth = window.innerWidth * 0.5;
-      const limitedWidth = Math.max(250, Math.min(newWidth, maxWidth));
+      
+      // Define constraints for the sidebar width
+      const minSidebarWidth = 250; // Existing minimum width for the sidebar
+      const maxSidebarWidth = windowWidth * 0.75; // Sidebar max 75% of screen width
+      
+      // The minimum width for the ChatCanvas (tree area) is 25% of screen width.
+      // This means the sidebar cannot be wider than 75% of the screen.
+      // maxSidebarWidth already enforces this.
+      
+      const limitedWidth = Math.max(minSidebarWidth, Math.min(newWidth, maxSidebarWidth));
       
       setSidebarWidth(limitedWidth);
     };
@@ -342,6 +393,24 @@ export default function WorkspacePage() {
     setSelectedImage(null);
   };
 
+  // Edit message handlers
+  const handleStartEdit = (messageIndex: number, nodeId: string, content: string) => {
+    setEditingState({
+      isEditing: true,
+      messageIndex,
+      nodeId,
+      originalContent: content
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingState(null);
+  };
+
+  const handleCompleteEdit = () => {
+    setEditingState(null);
+  };
+
   // Workspace handlers
   const handleWorkspaceChange = (workspaceId: string) => {
     const success = switchWorkspace(workspaceId);
@@ -389,7 +458,7 @@ export default function WorkspacePage() {
   };
 
   // Streaming event handlers for PromptBar
-  const handleStreamingStart = (config: { groundingEnabled: boolean; useGroundingPipeline: boolean; modelSupportsThinking: boolean; }) => {
+  const handleStreamingStart = (config: { groundingEnabled: boolean; modelSupportsThinking: boolean; }) => {
     console.log('🔄 Workspace: Streaming started', config);
     setStreamingState({
       isStreaming: true,
@@ -400,7 +469,6 @@ export default function WorkspacePage() {
       messagePhase: false,
       thoughtStartTime: Date.now(),
       groundingEnabled: config.groundingEnabled,
-      useGroundingPipeline: config.useGroundingPipeline,
       modelSupportsThinking: config.modelSupportsThinking
     });
   };
@@ -451,9 +519,13 @@ export default function WorkspacePage() {
       thoughtStartTime: prev.thoughtStartTime,
       thoughtEndTime: prev.thoughtEndTime || Date.now(),
       groundingEnabled: prev.groundingEnabled,
-      useGroundingPipeline: prev.useGroundingPipeline,
       modelSupportsThinking: prev.modelSupportsThinking
     }));
+    
+    // Save to storage after streaming is complete to ensure all conversation data is persisted
+    console.log('🔄 Workspace: Saving to storage after streaming complete');
+    const { saveToStorage } = useChatStore.getState();
+    saveToStorage();
   };
 
   const handleStreamingError = (error: string) => {
@@ -466,6 +538,11 @@ export default function WorkspacePage() {
       isThinkingPhase: false,
       messagePhase: false
     });
+    
+    // Save to storage after streaming error to preserve any partial data
+    console.log('🔄 Workspace: Saving to storage after streaming error');
+    const { saveToStorage } = useChatStore.getState();
+    saveToStorage();
   };
 
 
@@ -532,6 +609,7 @@ export default function WorkspacePage() {
                     isActiveNodeLoading={isLoading}
                     onImageClick={handleImageClick}
                     streamingState={streamingState}
+                    onStartEdit={handleStartEdit}
                   />
                 </div>
               </div>
@@ -561,6 +639,9 @@ export default function WorkspacePage() {
               onStreamingGrounding={handleStreamingGrounding}
               onStreamingComplete={handleStreamingComplete}
               onStreamingError={handleStreamingError}
+              editingState={editingState}
+              onCancelEdit={handleCancelEdit}
+              onCompleteEdit={handleCompleteEdit}
             />
           </div>
 
@@ -656,6 +737,7 @@ export default function WorkspacePage() {
                   onImageClick={handleImageClick}
                   isMobile={true}
                   streamingState={streamingState}
+                  onStartEdit={handleStartEdit}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-white/60 text-center p-8">
@@ -686,6 +768,9 @@ export default function WorkspacePage() {
               onStreamingGrounding={handleStreamingGrounding}
               onStreamingComplete={handleStreamingComplete}
               onStreamingError={handleStreamingError}
+              editingState={editingState}
+              onCancelEdit={handleCancelEdit}
+              onCompleteEdit={handleCompleteEdit}
             />
           </div>
         </div>

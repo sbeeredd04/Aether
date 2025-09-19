@@ -1,7 +1,6 @@
 import {
   GoogleGenAI,
   Modality,
-  Behavior,
   Tool,
 } from "@google/genai";
 import serverLogger from "./serverLogger";
@@ -60,16 +59,50 @@ export interface GroundedTextResponse {
   groundingMetadata?: GroundingMetadata;
 }
 
-// TTS options interface
-export interface TTSOptions {
-  voiceName?: string;
-  multiSpeaker?: Array<{ speaker: string; voiceName: string }>;
-}
 
 // Search grounding options
 export interface GroundingOptions {
   enabled: boolean;
   dynamicThreshold?: number; // 0-1, for Gemini 1.5 models only
+}
+
+// Helper function to add inline citations to text
+function addInlineCitations(text: string, groundingMetadata: any): string {
+  if (!groundingMetadata?.groundingSupports || !groundingMetadata?.groundingChunks) {
+    return text;
+  }
+
+  const supports = groundingMetadata.groundingSupports;
+  const chunks = groundingMetadata.groundingChunks;
+
+  // Sort supports by end_index in descending order to avoid shifting issues when inserting
+  const sortedSupports = supports.sort((a: any, b: any) => 
+    (b.segment?.endIndex || 0) - (a.segment?.endIndex || 0)
+  );
+
+  let modifiedText = text;
+
+  for (const support of sortedSupports) {
+    const endIndex = support.segment?.endIndex;
+    if (endIndex !== undefined && support.groundingChunkIndices) {
+      // Create citation string like [1](link1), [2](link2)
+      const citationLinks = [];
+      for (const chunkIndex of support.groundingChunkIndices) {
+        if (chunkIndex < chunks.length && chunks[chunkIndex]?.web) {
+          const uri = chunks[chunkIndex].web.uri;
+          const title = chunks[chunkIndex].web.title;
+          citationLinks.push(`[${chunkIndex + 1}](${uri} "${title}")`);
+        }
+      }
+
+      if (citationLinks.length > 0) {
+        const citationString = citationLinks.join(', ');
+        modifiedText = modifiedText.slice(0, endIndex) + citationString + modifiedText.slice(endIndex);
+      }
+    }
+  }
+
+  return modifiedText;
 }
 
 // Helper function to extract citations from raw grounding metadata
@@ -83,8 +116,7 @@ function extractCitations(rawMetadata: any): Array<{
     hasGroundingChunks: !!rawMetadata?.groundingChunks,
     hasGroundingSupports: !!rawMetadata?.groundingSupports,
     groundingChunksLength: rawMetadata?.groundingChunks?.length || 0,
-    groundingSupportsLength: rawMetadata?.groundingSupports?.length || 0,
-    rawMetadata
+    groundingSupportsLength: rawMetadata?.groundingSupports?.length || 0
   });
 
   if (!rawMetadata?.groundingChunks || !rawMetadata?.groundingSupports) {
@@ -108,29 +140,11 @@ function extractCitations(rawMetadata: any): Array<{
         title: chunk.web.title,
         uri: chunk.web.uri
       });
-      console.log('🔍 CITATION EXTRACTION DEBUG: Added chunk to map', {
-        index,
-        title: chunk.web.title,
-        uri: chunk.web.uri
-      });
     }
   });
 
-  console.log('🔍 CITATION EXTRACTION DEBUG: Chunk map built', {
-    chunkMapSize: chunkMap.size,
-    chunkMapEntries: Array.from(chunkMap.entries())
-  });
-
   // Extract citations with confidence scores
-  rawMetadata.groundingSupports.forEach((support: any, supportIndex: number) => {
-    console.log('🔍 CITATION EXTRACTION DEBUG: Processing support', {
-      supportIndex,
-      support,
-      groundingChunkIndices: support.groundingChunkIndices,
-      confidenceScores: support.confidenceScores,
-      segmentText: support.segment?.text
-    });
-
+  rawMetadata.groundingSupports.forEach((support: any) => {
     support.groundingChunkIndices.forEach((chunkIndex: number, idx: number) => {
       const citation = chunkMap.get(chunkIndex);
       if (citation) {
@@ -138,46 +152,17 @@ function extractCitations(rawMetadata: any): Array<{
         const existingCitation = citations.find(c => c.uri === citation.uri);
         
         if (!existingCitation) {
-          const newCitation = {
+          citations.push({
             ...citation,
             snippet: support.segment.text,
             confidenceScore
-          };
-          citations.push(newCitation);
-          console.log('🔍 CITATION EXTRACTION DEBUG: Added new citation', {
-            chunkIndex,
-            idx,
-            citation: newCitation
-          });
-        } else {
-          console.log('🔍 CITATION EXTRACTION DEBUG: Skipped duplicate citation', {
-            chunkIndex,
-            idx,
-            existingUri: citation.uri
           });
         }
-      } else {
-        console.log('🔍 CITATION EXTRACTION DEBUG: Citation not found in chunk map', {
-          chunkIndex,
-          idx,
-          availableChunks: Array.from(chunkMap.keys())
-        });
       }
     });
   });
 
-  const sortedCitations = citations.sort((a, b) => (b.confidenceScore || 0) - (a.confidenceScore || 0));
-  console.log('🔍 CITATION EXTRACTION DEBUG: Extraction complete', {
-    totalCitations: sortedCitations.length,
-    citations: sortedCitations.map(c => ({
-      title: c.title?.substring(0, 50) + (c.title?.length > 50 ? '...' : ''),
-      uri: c.uri,
-      confidenceScore: c.confidenceScore,
-      snippetLength: c.snippet?.length || 0
-    }))
-  });
-
-  return sortedCitations;
+  return citations.sort((a, b) => (b.confidenceScore || 0) - (a.confidenceScore || 0));
 }
 
 // Helper function to process grounding metadata
@@ -219,9 +204,8 @@ export async function generateContent(
   apiKey: string,
   history: { role: "user" | "model"; parts: Part[] }[],
   prompt: string,
-  modelId = "gemini-2.0-flash",
+  modelId = "gemini-2.5-flash",
   attachments?: AttachmentData[],
-  ttsOptions?: TTSOptions,
   grounding?: GroundingOptions,
   enableThinking?: boolean
 ): Promise<GenerateResult> {
@@ -310,36 +294,21 @@ export async function generateContent(
     // Prepare tools for grounding
     const tools: Tool[] = [];
     if (grounding?.enabled && modelDef.supportsGrounding) {
-      console.log(`🔍 GROUNDING DEBUG: Enabling grounding for model ${modelDef.apiModel}`, {
+      console.log(`🔍 GROUNDING DEBUG: Enabling Google Search grounding for ${modelDef.apiModel}`, {
         requestId,
         modelId,
         groundingEnabled: grounding.enabled,
-        dynamicThreshold: grounding.dynamicThreshold,
         supportsGrounding: modelDef.supportsGrounding
       });
 
-      if (modelDef.apiModel.includes('gemini-2.0')) {
-        const googleSearchTool = { googleSearch: {} } as any;
-        tools.push(googleSearchTool);
-        console.log(`🔍 GROUNDING DEBUG: Added Google Search tool for Gemini 2.0`, {
-          requestId,
-          tool: googleSearchTool
-        });
-      } else if (modelDef.apiModel.includes('gemini-1.5')) {
-        const searchTool: any = { googleSearchRetrieval: {} };
-        if (grounding.dynamicThreshold !== undefined) {
-          searchTool.googleSearchRetrieval.dynamicRetrievalConfig = {
-            mode: 'MODE_DYNAMIC',
-            dynamicThreshold: grounding.dynamicThreshold
-          };
-        }
-        tools.push(searchTool);
-        console.log(`🔍 GROUNDING DEBUG: Added Google Search Retrieval tool for Gemini 1.5`, {
-          requestId,
-          tool: searchTool,
-          dynamicThreshold: grounding.dynamicThreshold
-        });
-      }
+      // Use the new Google Search tool for Gemini 2.5
+      const googleSearchTool = { googleSearch: {} } as any;
+      tools.push(googleSearchTool);
+      
+      console.log(`🔍 GROUNDING DEBUG: Added Google Search tool`, {
+        requestId,
+        tool: googleSearchTool
+      });
     } else {
       console.log(`🔍 GROUNDING DEBUG: Grounding not enabled or not supported`, {
         requestId,
@@ -386,45 +355,6 @@ export async function generateContent(
       return { text: responseText };
     }
 
-    // AUDIO-ONLY (TTS) MODELS
-    if (modelDef.isMultimedia === "audio" && !modelDef.apiModel.includes("-live-")) {
-      const config: any = { 
-        responseModalities: [Modality.AUDIO],
-        tools: tools.length > 0 ? tools : undefined
-      };
-      
-      if (ttsOptions) {
-        if (ttsOptions.voiceName) {
-          config.speechConfig = {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: ttsOptions.voiceName } },
-          };
-        }
-        
-        if (ttsOptions.multiSpeaker) {
-          config.speechConfig = {
-            multiSpeakerVoiceConfig: {
-              speakerVoiceConfigs: ttsOptions.multiSpeaker.map(ms => ({
-                speaker: ms.speaker,
-                voiceConfig: { prebuiltVoiceConfig: { voiceName: ms.voiceName } }
-              }))
-            }
-          };
-        }
-      }
-
-      const response = await ai.models.generateContent({
-        model: modelDef.apiModel,
-        contents: [{ parts: contents }],
-        config,
-      });
-
-      const inline = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-      if (!inline || !inline.data) {
-        throw new Error("No audio returned from TTS model");
-      }
-
-      return { audioBase64: inline.data, mimeType: inline.mimeType || "audio/wav" };
-    }
 
     // IMAGE MODELS
     if (modelDef.isMultimedia === "image") {
@@ -487,8 +417,6 @@ export async function generateContent(
     if (groundingMetadata && grounding?.enabled) {
       console.log(`🔍 GROUNDING DEBUG: Raw grounding metadata received`, {
         requestId,
-        rawMetadata: groundingMetadata,
-        keys: Object.keys(groundingMetadata),
         hasSearchEntryPoint: !!groundingMetadata.searchEntryPoint,
         hasGroundingChunks: !!groundingMetadata.groundingChunks,
         hasGroundingSupports: !!groundingMetadata.groundingSupports,
@@ -498,14 +426,17 @@ export async function generateContent(
         webSearchQueriesLength: groundingMetadata.webSearchQueries?.length || 0
       });
 
+      // Add inline citations to the text
+      const textWithCitations = addInlineCitations(text, groundingMetadata);
+      
       const processedMetadata = processGroundingMetadata(groundingMetadata);
       
       console.log(`🔍 GROUNDING DEBUG: Processed grounding metadata`, {
         requestId,
-        processedMetadata,
         hasSearchEntryPoint: !!processedMetadata?.searchEntryPoint,
         citationsCount: processedMetadata?.citations?.length || 0,
-        searchQueriesCount: processedMetadata?.webSearchQueries?.length || 0
+        searchQueriesCount: processedMetadata?.webSearchQueries?.length || 0,
+        addedInlineCitations: textWithCitations !== text
       });
       
       serverLogger.info("Gemini: Grounding metadata processed", {
@@ -516,7 +447,7 @@ export async function generateContent(
       });
       
       return { 
-        text,
+        text: textWithCitations,
         groundingMetadata: processedMetadata
       } as GroundedTextResponse;
     } else {
@@ -550,214 +481,14 @@ export async function generateContent(
   }
 }
 
-// New streaming version with grounding pipeline for web thinking models
-export async function* generateContentStreamWithGrounding(
-  apiKey: string,
-  history: { role: "user" | "model"; parts: Part[] }[],
-  prompt: string,
-  modelId = "gemini-2.5-flash-web-thinking",
-  attachments?: AttachmentData[],
-  ttsOptions?: TTSOptions,
-  grounding?: GroundingOptions,
-  enableThinking?: boolean
-): AsyncGenerator<{ 
-  type: 'thought' | 'message' | 'complete' | 'grounding'; 
-  content: string; 
-  audioData?: string;
-  groundingMetadata?: GroundingMetadata;
-}, void, unknown> {
-
-  const requestId = Math.random().toString(36).substring(7);
-  serverLogger.info("🔄 Streaming Grounding Pipeline: Started", { 
-    requestId,
-    modelId,
-    promptLength: prompt?.length || 0,
-    attachmentsCount: attachments?.length || 0,
-    enableThinking,
-    groundingEnabled: grounding?.enabled
-  });
-
-  if (!apiKey) {
-    throw new Error("Google Gemini API key is required");
-  }
-
-  const startTime = Date.now();
-
-  try {
-    // STEP 1: Emit web search loading state - only if grounding is enabled
-    if (grounding?.enabled) {
-      yield { type: 'grounding', content: 'Searching the web...', groundingMetadata: undefined };
-    }
-    
-    // Get grounding information from Gemini 2.0 Flash (non-streaming)
-    console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Step 1 - Getting grounding from Gemini 2.0 Flash', {
-      requestId,
-      prompt: prompt.substring(0, 100) + '...',
-      groundingEnabled: grounding?.enabled
-    });
-
-    const groundingResult = await generateContent(
-      apiKey,
-      history,
-      prompt,
-      "gemini-2.0-flash", // Always use Gemini 2.0 Flash for grounding
-      attachments,
-      undefined, // No TTS for grounding step
-      grounding, // Use grounding settings
-      false // No thinking for grounding step
-    );
-
-    console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Step 1 complete', {
-      requestId,
-      hasGroundingMetadata: 'groundingMetadata' in groundingResult && !!groundingResult.groundingMetadata,
-      textLength: 'text' in groundingResult ? groundingResult.text.length : 0,
-      groundingResultType: 'text' in groundingResult ? 'text' : 'other'
-    });
-
-    let groundingText = '';
-    let groundingMetadata: GroundingMetadata | undefined;
-
-    if ('text' in groundingResult) {
-      groundingText = groundingResult.text;
-      if ('groundingMetadata' in groundingResult) {
-        groundingMetadata = groundingResult.groundingMetadata;
-        
-        console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Grounding metadata received', {
-          requestId,
-          hasSearchEntryPoint: !!groundingMetadata?.searchEntryPoint,
-          citationsCount: groundingMetadata?.citations?.length || 0,
-          searchQueriesCount: groundingMetadata?.webSearchQueries?.length || 0,
-          groundingChunksCount: groundingMetadata?.groundingChunks?.length || 0
-        });
-
-        // Send grounding metadata immediately
-        yield { type: 'grounding', content: '', groundingMetadata };
-      }
-    }
-
-    // STEP 2: Emit thinking phase loading state
-    yield { type: 'grounding', content: 'Analyzing with deep thinking...', groundingMetadata: undefined };
-
-    // Create enhanced prompt with grounding context
-    let enhancedPrompt = prompt;
-    if (groundingText && groundingMetadata?.citations && groundingMetadata.citations.length > 0) {
-      const citationsText = groundingMetadata.citations
-        .map((citation, idx) => `[${idx + 1}] ${citation.title} - ${citation.uri}${citation.snippet ? `\nSnippet: ${citation.snippet}` : ''}`)
-        .join('\n\n');
-
-      const searchQueriesText = groundingMetadata.webSearchQueries 
-        ? `Search queries used: ${groundingMetadata.webSearchQueries.join(', ')}`
-        : '';
-
-      enhancedPrompt = `${prompt}
-
-CONTEXT FROM WEB SEARCH:
-${searchQueriesText}
-
-SEARCH RESULTS:
-${citationsText}
-
-GROUNDED RESPONSE:
-${groundingText}
-
-Please provide a thoughtful analysis based on the above web search results and context. Reference the sources when relevant.`;
-
-      console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Enhanced prompt created', {
-        requestId,
-        originalPromptLength: prompt.length,
-        enhancedPromptLength: enhancedPrompt.length,
-        citationsIncluded: groundingMetadata.citations.length,
-        searchQueriesIncluded: groundingMetadata.webSearchQueries?.length || 0
-      });
-    } else {
-      console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: No grounding context available, using original prompt', {
-        requestId,
-        hasGroundingText: !!groundingText,
-        hasCitations: !!groundingMetadata?.citations?.length
-      });
-    }
-
-    // STEP 3: Stream thinking response with grounded context
-    console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Step 2 - Starting thinking model stream', {
-      requestId,
-      thinkingModelId: modelId,
-      enhancedPromptLength: enhancedPrompt.length
-    });
-
-    const thinkingGenerator = generateContentStream(
-      apiKey,
-      history,
-      enhancedPrompt, // Use enhanced prompt with grounding context
-      modelId, // Use the original thinking model
-      attachments,
-      ttsOptions,
-      undefined, // Don't use grounding again in thinking step
-      enableThinking
-    );
-
-    let chunkCount = 0;
-    let fullResponse = '';
-
-    for await (const chunk of thinkingGenerator) {
-      chunkCount++;
-      
-      console.log('🔍 STREAMING GROUNDING PIPELINE DEBUG: Thinking chunk received', {
-        requestId,
-        chunkCount,
-        type: chunk.type,
-        contentLength: chunk.content.length,
-        hasAudioData: !!chunk.audioData
-      });
-
-      if (chunk.type === 'message' || chunk.type === 'thought') {
-        fullResponse += chunk.content;
-      }
-
-      // Forward all chunks except don't override grounding metadata
-      if (chunk.type === 'complete') {
-        // For complete, include the original grounding metadata
-        yield { 
-          ...chunk, 
-          groundingMetadata: groundingMetadata || chunk.groundingMetadata 
-        };
-      } else if (chunk.type !== 'grounding') {
-        // Forward all other chunks as-is (but skip any additional grounding from thinking model)
-        yield chunk;
-      }
-    }
-
-    serverLogger.info("🔄 Streaming Grounding Pipeline: Complete", { 
-      requestId,
-      duration: `${Date.now() - startTime}ms`,
-      groundingStep1Duration: 'calculated separately',
-      thinkingChunks: chunkCount,
-      finalResponseLength: fullResponse.length,
-      hasGroundingMetadata: !!groundingMetadata
-    });
-
-  } catch (error) {
-    serverLogger.error("🔄 Streaming Grounding Pipeline: Failed", { 
-      requestId,
-      modelId,
-      duration: `${Date.now() - startTime}ms`,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-
-    if (error instanceof Error) {
-      error.message = `[Grounding Pipeline ${modelId}] ${error.message}`;
-    }
-    throw error;
-  }
-}
 
 // New streaming version with enhanced grounding support
 export async function* generateContentStream(
   apiKey: string,
   history: { role: "user" | "model"; parts: Part[] }[],
   prompt: string,
-  modelId = "gemini-2.0-flash",
+  modelId = "gemini-2.5-flash",
   attachments?: AttachmentData[],
-  ttsOptions?: TTSOptions,
   grounding?: GroundingOptions,
   enableThinking?: boolean
 ): AsyncGenerator<{ 
@@ -852,19 +583,10 @@ export async function* generateContentStream(
     // Prepare tools for grounding
     const tools: Tool[] = [];
     if (grounding?.enabled && modelDef.supportsGrounding) {
-      serverLogger.info("🔄 Streaming: Adding grounding tools", { requestId });
-      if (modelDef.apiModel.includes('gemini-2.0')) {
-        tools.push({ googleSearch: {} } as any);
-      } else if (modelDef.apiModel.includes('gemini-1.5')) {
-        const searchTool: any = { googleSearchRetrieval: {} };
-        if (grounding.dynamicThreshold !== undefined) {
-          searchTool.googleSearchRetrieval.dynamicRetrievalConfig = {
-            mode: 'MODE_DYNAMIC',
-            dynamicThreshold: grounding.dynamicThreshold
-          };
-        }
-        tools.push(searchTool);
-      }
+      serverLogger.info("🔄 Streaming: Adding Google Search grounding tool", { requestId });
+      // Use the new Google Search tool for Gemini 2.5
+      const googleSearchTool = { googleSearch: {} } as any;
+      tools.push(googleSearchTool);
     }
 
     // THINKING MODELS
@@ -911,7 +633,6 @@ export async function* generateContentStream(
           console.log(`🔍 GROUNDING DEBUG: Thinking model chunk with grounding metadata`, {
             requestId,
             chunkCount,
-            rawMetadata: chunk.candidates[0].groundingMetadata,
             hasGroundingChunks: !!chunk.candidates[0].groundingMetadata.groundingChunks,
             hasGroundingSupports: !!chunk.candidates[0].groundingMetadata.groundingSupports,
             hasWebSearchQueries: !!chunk.candidates[0].groundingMetadata.webSearchQueries
@@ -924,7 +645,6 @@ export async function* generateContentStream(
             console.log(`🔍 GROUNDING DEBUG: Thinking model processed grounding metadata`, {
               requestId,
               chunkCount,
-              processedMetadata,
               citationsCount: processedMetadata.citations?.length || 0,
               searchQueriesCount: processedMetadata.webSearchQueries?.length || 0,
               hasSearchEntryPoint: !!processedMetadata.searchEntryPoint
@@ -937,13 +657,6 @@ export async function* generateContentStream(
             });
             yield { type: 'grounding', content: '', groundingMetadata: processedMetadata };
           }
-        } else if (grounding?.enabled) {
-          console.log(`🔍 GROUNDING DEBUG: Thinking model chunk without grounding metadata`, {
-            requestId,
-            chunkCount,
-            hasGroundingMetadata: !!chunk.candidates?.[0]?.groundingMetadata,
-            groundingEnabled: grounding?.enabled
-          });
         }
         
         // Add a small delay between chunks to prevent UI overwhelm
@@ -952,26 +665,6 @@ export async function* generateContentStream(
         }
       }
 
-      // Generate TTS if requested
-      let audioData: string | undefined;
-      if (ttsOptions && fullResponse) {
-        try {
-          serverLogger.info("🔄 Streaming: Generating TTS", { requestId });
-          const ttsResult = await generateContent(
-            apiKey,
-            [],
-            `Say in a warm, empathetic voice: ${fullResponse}`,
-            "gemini-2.5-flash-preview-tts",
-            undefined,
-            ttsOptions
-          );
-          if ('audioBase64' in ttsResult) {
-            audioData = ttsResult.audioBase64;
-          }
-        } catch (error) {
-          serverLogger.warn("🔄 Streaming: TTS failed", { requestId, error });
-        }
-      }
 
       serverLogger.info("🔄 Streaming: Complete", { 
         requestId,
@@ -979,33 +672,27 @@ export async function* generateContentStream(
         chunks: chunkCount,
         thoughtsLength: fullThoughts.length,
         responseLength: fullResponse.length,
-        hasAudio: !!audioData,
         hasGrounding: !!finalGroundingMetadata
       });
 
+      // Add inline citations to the full response if grounding metadata is available
+      const responseWithCitations = finalGroundingMetadata ? 
+        addInlineCitations(fullResponse, { groundingSupports: finalGroundingMetadata.groundingSupports, groundingChunks: finalGroundingMetadata.groundingChunks }) : 
+        fullResponse;
+
       yield { 
         type: 'complete', 
-        content: fullResponse, 
-        audioData,
+        content: responseWithCitations,
         groundingMetadata: finalGroundingMetadata
       };
       return;
     }
 
-    // TTS MODELS (fallback to non-streaming)
-    if (modelDef.isMultimedia === "audio" && !modelDef.apiModel.includes("-live-")) {
-      serverLogger.info("🔄 Streaming: TTS fallback to non-streaming", { requestId });
-      const result = await generateContent(apiKey, history, prompt, modelId, attachments, ttsOptions, grounding, enableThinking);
-      if ('audioBase64' in result) {
-        yield { type: 'complete', content: '', audioData: result.audioBase64 };
-      }
-      return;
-    }
 
     // IMAGE MODELS (fallback to non-streaming)
     if (modelDef.isMultimedia === "image") {
       serverLogger.info("🔄 Streaming: Image fallback to non-streaming", { requestId });
-      const result = await generateContent(apiKey, history, prompt, modelId, attachments, ttsOptions, grounding, enableThinking);
+      const result = await generateContent(apiKey, history, prompt, modelId, attachments, grounding, enableThinking);
       if ('images' in result) {
         yield { type: 'complete', content: `Generated ${result.images.length} image(s)` };
       }
@@ -1053,7 +740,6 @@ export async function* generateContentStream(
         console.log(`🔍 GROUNDING DEBUG: Streaming chunk with grounding metadata`, {
           requestId,
           chunkCount,
-          rawMetadata: chunk.candidates[0].groundingMetadata,
           hasGroundingChunks: !!chunk.candidates[0].groundingMetadata.groundingChunks,
           hasGroundingSupports: !!chunk.candidates[0].groundingMetadata.groundingSupports,
           hasWebSearchQueries: !!chunk.candidates[0].groundingMetadata.webSearchQueries
@@ -1066,7 +752,6 @@ export async function* generateContentStream(
           console.log(`🔍 GROUNDING DEBUG: Streaming processed grounding metadata`, {
             requestId,
             chunkCount,
-            processedMetadata,
             citationsCount: processedMetadata.citations?.length || 0,
             searchQueriesCount: processedMetadata.webSearchQueries?.length || 0,
             hasSearchEntryPoint: !!processedMetadata.searchEntryPoint
@@ -1079,50 +764,26 @@ export async function* generateContentStream(
           });
           yield { type: 'grounding', content: '', groundingMetadata: processedMetadata };
         }
-      } else if (grounding?.enabled) {
-        console.log(`🔍 GROUNDING DEBUG: Streaming chunk without grounding metadata`, {
-          requestId,
-          chunkCount,
-          hasGroundingMetadata: !!chunk.candidates?.[0]?.groundingMetadata,
-          groundingEnabled: grounding?.enabled
-        });
       }
     }
 
-    // Generate TTS if requested
-    let audioData: string | undefined;
-    if (ttsOptions && fullResponse) {
-      try {
-        serverLogger.info("🔄 Streaming: Generating TTS", { requestId });
-        const ttsResult = await generateContent(
-          apiKey,
-          [],
-          `Say in a warm, empathetic voice: ${fullResponse}`,
-          "gemini-2.5-flash-preview-tts",
-          undefined,
-          ttsOptions
-        );
-        if ('audioBase64' in ttsResult) {
-          audioData = ttsResult.audioBase64;
-        }
-      } catch (error) {
-        serverLogger.warn("🔄 Streaming: TTS failed", { requestId, error });
-      }
-    }
 
     serverLogger.info("🔄 Streaming: Complete", { 
       requestId,
       duration: `${Date.now() - startTime}ms`,
       chunks: chunkCount,
       responseLength: fullResponse.length,
-      hasAudio: !!audioData,
       hasGrounding: !!finalGroundingMetadata
     });
 
+    // Add inline citations to the full response if grounding metadata is available
+    const responseWithCitations = finalGroundingMetadata ? 
+      addInlineCitations(fullResponse, { groundingSupports: finalGroundingMetadata.groundingSupports, groundingChunks: finalGroundingMetadata.groundingChunks }) : 
+      fullResponse;
+
     yield { 
       type: 'complete', 
-      content: fullResponse, 
-      audioData,
+      content: responseWithCitations,
       groundingMetadata: finalGroundingMetadata
     };
 

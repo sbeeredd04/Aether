@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { FiRefreshCw, FiTrash2, FiPlus, FiX, FiFileText, FiChevronDown, FiChevronRight } from 'react-icons/fi';
+import { FiRefreshCw, FiTrash2, FiPlus, FiX, FiFileText, FiChevronDown, FiChevronRight, FiEdit3, FiCheck, FiXCircle } from 'react-icons/fi';
 import { CustomNodeData, useChatStore, ChatMessage, AttachmentData } from '../store/chatStore';
 import { SiGooglegemini } from 'react-icons/si';
 import { MarkdownRenderer, hasMarkdown } from '../utils/markdown';
@@ -20,7 +20,6 @@ interface StreamingState {
   thoughtStartTime?: number;
   thoughtEndTime?: number;
   groundingEnabled?: boolean;
-  useGroundingPipeline?: boolean;
   modelSupportsThinking?: boolean;
   groundingMetadata?: {
     searchEntryPoint?: {
@@ -66,6 +65,7 @@ interface NodeSidebarProps {
   onImageClick?: (imageSrc: string, imageTitle: string) => void;
   isMobile?: boolean;
   streamingState?: StreamingState;
+  onStartEdit?: (messageIndex: number, nodeId: string, content: string) => void;
 }
 
 export default function NodeSidebar({
@@ -81,7 +81,8 @@ export default function NodeSidebar({
   isActiveNodeLoading = false,
   onImageClick,
   isMobile = false,
-  streamingState
+  streamingState,
+  onStartEdit
 }: NodeSidebarProps) {
   const { getPathToNode, nodes, edges } = useChatStore();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -301,24 +302,8 @@ export default function NodeSidebar({
     return content;
   };
 
-  // Loading dots animation
-  const LoadingDots = () => (
-    <span className="flex gap-1 items-center h-6">
-      <span className="bg-white/80 rounded-full w-2 h-2 animate-bounce [animation-delay:0ms]"></span>
-      <span className="bg-white/60 rounded-full w-2 h-2 animate-bounce [animation-delay:150ms]"></span>
-      <span className="bg-white/40 rounded-full w-2 h-2 animate-bounce [animation-delay:300ms]"></span>
-    </span>
-  );
-
   // Streaming message component with cursor
   const StreamingContent = ({ content }: { content: string }) => {
-    if (!content) {
-      return (
-        <div className="flex items-center gap-2">
-          <LoadingDots />
-        </div>
-      );
-    }
     
     const hasMarkdownSyntax = hasMarkdown(content);
     
@@ -455,16 +440,49 @@ export default function NodeSidebar({
     return 0;
   };
 
+  // Helper function to find which node a message belongs to and its local index
+  const findMessageNodeAndIndex = (globalIndex: number) => {
+    const pathNodeIds = getPathFromRootToNode(nodeId!);
+    let currentIndex = 0;
+    
+    for (const id of pathNodeIds) {
+      const node = nodes.find(n => n.id === id);
+      if (node && node.data.chatHistory) {
+        const nodeMessageCount = node.data.chatHistory.length;
+        
+        // Check if the global index falls within this node's messages
+        if (globalIndex >= currentIndex && globalIndex < currentIndex + nodeMessageCount) {
+          const localIndex = globalIndex - currentIndex;
+          return { nodeId: id, localIndex };
+        }
+        
+        currentIndex += nodeMessageCount;
+      }
+    }
+    
+    return null;
+  };
+
+  // Handle edit button click
+  const handleEditClick = (messageIndex: number, content: string) => {
+    if (!onStartEdit || !nodeId) return;
+    
+    const messageInfo = findMessageNodeAndIndex(messageIndex);
+    if (messageInfo) {
+      onStartEdit(messageIndex, messageInfo.nodeId, content);
+    }
+  };
+
   if (!isOpen || !data) return null;
 
   const hasResponse = data.chatHistory.some(msg => msg.role === 'model');
 
   // Helper for model name with support for different models
   const getModelName = (modelId?: string) => {
-    if (!modelId) return 'Gemini 2.0 Flash';
+    if (!modelId) return 'Gemini 2.5 Flash';
     
     // You can expand this to support more models
-    if (modelId.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
+    if (modelId.includes('gemini-2.5-flash')) return 'Gemini 2.5 Flash';
     if (modelId.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro';
     if (modelId.includes('gemini-1.5-flash')) return 'Gemini 1.5 Flash';
     if (modelId.includes('gpt-4')) return 'GPT-4';
@@ -473,7 +491,7 @@ export default function NodeSidebar({
     return modelId; // Fallback to model ID
   };
   
-  const isGeminiModel = (modelId?: string) => (modelId || 'gemini-2.0-flash').toLowerCase().includes('gemini');
+  const isGeminiModel = (modelId?: string) => (modelId || 'gemini-2.5-flash').toLowerCase().includes('gemini');
 
   return (
     <div 
@@ -589,14 +607,26 @@ export default function NodeSidebar({
                         <div className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-gray-300/80 font-space-grotesk`}>
                           {isUser ? 'You' : getModelName((msg as any).modelId)}
                         </div>
-                        {/* Copy button for both user and model responses */}
-                        {(isUser || (isModel && displayContent)) && (
-                          <CopyButton 
-                            content={isUser ? msg.content : (parsedContent?.hasThoughts ? parsedContent.answer || displayContent : displayContent)} 
-                            size={isMobile ? 10 : 12} 
-                            className="opacity-60 hover:opacity-100"
-                          />
-                        )}
+                        <div className="flex items-center gap-1">
+                          {/* Edit button for user messages */}
+                          {isUser && onStartEdit && (
+                            <button
+                              onClick={() => handleEditClick(idx, msg.content)}
+                              className="opacity-60 hover:opacity-100 text-blue-300 hover:text-blue-200 transition-colors"
+                              title="Edit message"
+                            >
+                              <FiEdit3 size={isMobile ? 10 : 12} />
+                            </button>
+                          )}
+                          {/* Copy button for both user and model responses */}
+                          {(isUser || (isModel && displayContent)) && (
+                            <CopyButton 
+                              content={isUser ? msg.content : (parsedContent?.hasThoughts ? parsedContent.answer || displayContent : displayContent)} 
+                              size={isMobile ? 10 : 12} 
+                              className="opacity-60 hover:opacity-100"
+                            />
+                          )}
+                        </div>
                       </div>
 
                       {msg.attachments && msg.attachments.length > 0 && (
@@ -689,11 +719,7 @@ export default function NodeSidebar({
                                     {streamingState.isThinkingPhase ? (
                                       <>
                                         <span className="font-semibold text-blue-300">Thinking</span>
-                                        <div className="flex gap-1 mr-2">
-                                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
-                                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:200ms]"></div>
-                                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:400ms]"></div>
-                                        </div>
+                                        {/* <div className="w-3 h-3 border border-blue-400/50 border-t-blue-400 rounded-full animate-spin mr-2"></div> */}
                                         <span className="flex-1">
                                           {getThoughtTitle(streamingState.currentThoughts, true)}
                                         </span>
@@ -825,7 +851,6 @@ export default function NodeSidebar({
                         
                         // Determine if grounding is actually enabled for this request
                         const isActuallyGroundingEnabled = streamingState?.groundingEnabled === true;
-                        const isUsingGroundingPipeline = streamingState?.useGroundingPipeline === true;
                         const modelSupportsThinking = streamingState?.modelSupportsThinking === true;
                         
                         // Show loading state based on actual pipeline configuration
@@ -833,14 +858,13 @@ export default function NodeSidebar({
                           // Show specific loading message from the grounding pipeline
                           const loadingText = streamingState.groundingMetadata?.loadingMessage;
                           
-                          console.log('🔍 NODESIDEBAR DEBUG: Showing specific loading state from pipeline', {
+                          console.log('🔍 NODESIDEBAR DEBUG: Showing specific loading state', {
                             messageIndex: idx,
                             nodeId: nodeId,
                             isStreaming: streamingState.isStreaming,
                             hasGroundingMetadata,
                             hasLoadingMessage,
                             isActuallyGroundingEnabled,
-                            isUsingGroundingPipeline,
                             loadingText,
                             modelId: (msg as any).modelId
                           });
@@ -848,11 +872,7 @@ export default function NodeSidebar({
                           return (
                             <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
                               <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
-                                <div className="flex gap-1">
-                                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]"></div>
-                                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:150ms]"></div>
-                                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
-                                </div>
+                                {/* <div className="w-3 h-3 border border-blue-400/50 border-t-blue-400 rounded-full animate-spin"></div> */}
                                 {loadingText}
                               </div>
                             </div>
@@ -871,15 +891,9 @@ export default function NodeSidebar({
                           });
                           
                           return (
-                            <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
-                              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-purple-300 mb-2 flex items-center gap-2`}>
-                                <div className="flex gap-1">
-                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0ms]"></div>
-                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:150ms]"></div>
-                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]"></div>
-                                </div>
-                                Thinking...
-                              </div>
+                            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-white-300 mb-2 flex items-center gap-2`}>
+                              {/* <div className="w-3 h-3 border border-purple-400/50 border-t-white-400 rounded-full animate-spin"></div> */}
+                              {/* Thinking... */}
                             </div>
                           );
                         }
@@ -899,7 +913,7 @@ export default function NodeSidebar({
                           return (
                             <div className={`mt-3 pt-3 border-t border-neutral-700/50`}>
                               <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-300 mb-2 flex items-center gap-2`}>
-                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                {/* <div className="w-3 h-3 border border-blue-400/50 border-t-blue-400 rounded-full animate-spin"></div> */}
                                 Web search results
                               </div>
                               <Citations
